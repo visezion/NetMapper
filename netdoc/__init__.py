@@ -8,13 +8,27 @@ import os
 import shutil
 
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models.signals import post_migrate
 
 from netbox.plugins import PluginConfig
 
-PLUGIN_SETTINGS = settings.PLUGINS_CONFIG.get("netdoc", {})
-NTC_TEMPLATES_DIR = PLUGIN_SETTINGS.get("NTC_TEMPLATES_DIR")
 MODULE_PATH = os.path.dirname(__file__)
+
+
+def get_plugin_settings():
+    """Return plugin settings when Django settings are available."""
+    try:
+        return settings.PLUGINS_CONFIG.get("netdoc", {})
+    except ImproperlyConfigured:
+        return {}
+
+
+def get_ntc_templates_dir():
+    """Resolve the ntc-templates directory without requiring configured settings."""
+    return get_plugin_settings().get("NTC_TEMPLATES_DIR") or os.path.join(
+        MODULE_PATH, "ntc_templates"
+    )
 
 
 def sync_plugin_assets():
@@ -116,7 +130,7 @@ class NetdocConfig(PluginConfig):
             dispatch_uid="netdoc.sync_plugin_assets_after_migrate",
         )
 
-        if PLUGIN_SETTINGS.get("SYNC_ON_STARTUP"):
+        if get_plugin_settings().get("SYNC_ON_STARTUP"):
             sync_plugin_assets()
 
         super().ready()
@@ -124,8 +138,4 @@ class NetdocConfig(PluginConfig):
 
 config = NetdocConfig  # pylint: disable=invalid-name
 
-# Setting NTC_TEMPLATES_DIR.
-if not NTC_TEMPLATES_DIR:
-    NTC_TEMPLATES_DIR = os.path.join(MODULE_PATH, "ntc_templates")
-
-os.environ.setdefault("NET_TEXTFSM", NTC_TEMPLATES_DIR)
+os.environ.setdefault("NET_TEXTFSM", get_ntc_templates_dir())
