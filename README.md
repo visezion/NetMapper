@@ -6,8 +6,9 @@ NetDoc would be the industrialized, open-source tool available to the public to 
 
 Compatibility:
 
-* NetDoc 3.5.x requires NetBox 3.5.x
-* NetDoc 0.10.x requires NetBox 3.4.x
+* The current repository is being updated for NetBox 4.6.x.
+* Historical NetDoc 3.5.x targeted NetBox 3.5.x.
+* Historical NetDoc 0.10.x targeted NetBox 3.4.x.
 
 ## Table of contents
 

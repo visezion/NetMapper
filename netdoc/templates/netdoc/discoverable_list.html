@@ -14,7 +14,7 @@ Add "Discover Selected" button to the generic template.
         <button type="submit"
                 name="_discover"
                 formaction="{% url "plugins:netdoc:discoverable_bulk_discover" %}?return_url={% url "plugins:netdoc:discoverable_list" %}"
-                class="btn btn-secondary btn-sm">
+                class="btn btn-secondary">
             <i class="mdi mdi-refresh" aria-hidden="true"></i> Discover Selected
         </button>
     {% endif %}

@@ -115,6 +115,7 @@ def get_schema_create():
 
 def create(type="other", **kwargs):  # pylint: disable=redefined-builtin
     """Create an Interface."""
+    mac_address = kwargs.pop("mac_address", None)
     # The following are updated in update_mode
     if "mode" in kwargs:
         del kwargs["mode"]
@@ -131,6 +132,8 @@ def create(type="other", **kwargs):  # pylint: disable=redefined-builtin
 
     data = utils.delete_empty_keys(data)
     obj = utils.object_create(Interface_model, **data)
+    if mac_address:
+        obj = utils.sync_primary_mac_address(obj, mac_address)
     return obj
 
 
@@ -155,7 +158,6 @@ def update(obj, **kwargs):
         "speed",
         "duplex",
         "vrf_id",
-        "mac_address",
         "mtu",
         "enabled",
         "parent_id",
@@ -179,6 +181,8 @@ def update(obj, **kwargs):
     validate(data, get_schema(), format_checker=FormatChecker())
     kwargs_always = utils.filter_keys(data, update_always)
     obj = utils.object_update(obj, **kwargs_always)
+    if "mac_address" in data:
+        obj = utils.sync_primary_mac_address(obj, data.get("mac_address"))
     return obj
 
 

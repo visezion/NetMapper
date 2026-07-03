@@ -6,8 +6,8 @@ __contact__ = "andrea@adainese.it"
 __copyright__ = "Copyright 2022, Andrea Dainese"
 __license__ = "GPLv3"
 {% endcomment %}
-{% block controls %}
-{% endblock controls %}
+{% block control-buttons %}
+{% endblock control-buttons %}
 {% block tabs %}
 {% endblock tabs %}
 {% block content %}
@@ -72,7 +72,7 @@ __license__ = "GPLv3"
         <div class="col col-md-12">
             <div class="card">
                 <h5 class="card-header">Relevant ARP address table entries</h5>
-                <div class="card-body table-responsive">{% render_table arp_table %}</div>
+                <div class="table-responsive">{% render_table arp_table %}</div>
             </div>
         </div>
     </div>
@@ -80,7 +80,7 @@ __license__ = "GPLv3"
         <div class="col col-md-12">
             <div class="card">
                 <h5 class="card-header">Relevant MAC address table entries</h5>
-                <div class="card-body table-responsive">{% render_table macaddress_table %}</div>
+                <div class="table-responsive">{% render_table macaddress_table %}</div>
             </div>
         </div>
     </div>

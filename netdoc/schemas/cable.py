@@ -8,7 +8,6 @@ from jsonschema import validate, FormatChecker
 
 from django.conf import settings
 from django.db.utils import IntegrityError
-from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 
 from dcim.models import Interface as Interface_model, Cable, CableTermination
@@ -16,9 +15,6 @@ from dcim.models import Interface as Interface_model, Cable, CableTermination
 from netdoc.schemas import interface
 
 PLUGIN_SETTINGS = settings.PLUGINS_CONFIG.get("netdoc", {})
-TERMINATION_TYPE = ContentType.objects.get(model="interface")
-
-
 def get_schema():
     """Return the JSON schema to validate ArpTableEntry data."""
     return {

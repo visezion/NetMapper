@@ -12,8 +12,8 @@ __license__ = "GPLv3"
 {% endblock head %}
 {% block title %}Diagram {{ object.name }}{% endblock title %}
 {% block extra_controls %}
-    <a id="btnToggleDiagramMode" class="btn btn-sm btn-secondary" href="#"></a>
-    <a id="btnSaveDiagram" class="btn btn-sm btn-primary" href="#">
+    <a id="btnToggleDiagramMode" class="btn btn-secondary" href="#"></a>
+    <a id="btnSaveDiagram" class="btn btn-primary" href="#">
         <i class="mdi mdi-upload"></i>
         Save
     </a>
@@ -21,13 +21,13 @@ __license__ = "GPLv3"
 {% endblock extra_controls %}
 {% block tabs %}
 {% endblock tabs %}
-{% block content-wrapper %}
-    <div class="content h-100 p-0">
+{% block content %}
+    <div class="h-100 p-0">
         <!-- djlint:off -->
-        <div id="visgraph" class="" style="height: 70vh;"></div>
+        <div id="visgraph" style="height: 70vh;"></div>
         <!-- djlint:on -->
     </div>
-{% endblock content-wrapper %}
+{% endblock content %}
 {% block javascript %}
     {{ topology_details|json_script:"topology_details_json" }}
     {{ topology_data|json_script:"topology_data_json" }}

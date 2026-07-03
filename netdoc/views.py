@@ -34,9 +34,9 @@ class ArpTableListView(generic.ObjectListView):
     )
     table = tables.ArpTableEntryTable
     filterset = filtersets.ArpTableEntryFilterSet
-    actions = [
-        "export",
-    ]
+    actions = {
+        "export": set(),
+    }
 
 
 class ArpTableView(generic.ObjectView):
@@ -77,11 +77,11 @@ class CredentialListView(generic.ObjectListView):
     ).order_by("name")
     table = tables.CredentialTable
     filterset = filtersets.CredentialFilterSet
-    actions = [
-        "add",
-        "import",
-        "bulk_delete",
-    ]
+    actions = {
+        "add": {"add"},
+        "import": {"add"},
+        "bulk_delete": {"delete"},
+    }
 
 
 class CredentialView(generic.ObjectView):
@@ -248,15 +248,15 @@ class DiscoverableListView(generic.ObjectListView):
         discoverylogs_count=Count("discoverylogs")
     ).order_by("device__name", "address")
     table = tables.DiscoverableTable
-    actions = [
-        "add",
-        "import",
-        "export",
-        "discover",
-        "bulk_edit",
-        "bulk_delete",
-        "bulk_discover",
-    ]
+    actions = {
+        "add": {"add"},
+        "import": {"add"},
+        "export": set(),
+        "discover": {"change"},
+        "bulk_edit": {"change"},
+        "bulk_delete": {"delete"},
+        "bulk_discover": {"change"},
+    }
     template_name = "netdoc/discoverable_list.html"
     filterset = filtersets.DiscoverableFilterSet
     filterset_form = forms.DiscoverableListFilterForm
@@ -505,7 +505,9 @@ class DiscoveryLogListView(generic.ObjectListView):
     table = tables.DiscoveryLogTable
     filterset = filtersets.DiscoveryLogFilterSet
     filterset_form = forms.DiscoveryLogListFilterForm
-    actions = ["delete", "bulk_delete"]  # Read-only + delete + bulk-delete delete
+    actions = {
+        "bulk_delete": {"delete"},
+    }
 
 
 class DiscoveryLogView(generic.ObjectView):
@@ -561,9 +563,9 @@ class MacAddressTableListView(generic.ObjectListView):
     )
     table = tables.MacAddressTableEntryTable
     filterset = filtersets.MacAddressTableEntryFilterSet
-    actions = [
-        "export",
-    ]
+    actions = {
+        "export": set(),
+    }
 
 
 class MacAddressTableView(generic.ObjectView):
@@ -605,9 +607,9 @@ class RouteTableEntryListView(generic.ObjectListView):
     )
     table = tables.RouteTableEntryTable
     filterset = filtersets.RouteTableEntryFilterSet
-    actions = [
-        "export",
-    ]
+    actions = {
+        "export": set(),
+    }
 
 
 class RouteTableEntryView(generic.ObjectView):

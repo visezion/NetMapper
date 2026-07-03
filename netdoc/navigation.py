@@ -4,21 +4,18 @@ __contact__ = "andrea@adainese.it"
 __copyright__ = "Copyright 2022, Andrea Dainese"
 __license__ = "GPLv3"
 
-from extras.plugins import PluginMenuButton, PluginMenuItem, PluginMenu
-from utilities.choices import ButtonColorChoices
+from netbox.plugins import PluginMenuButton, PluginMenuItem, PluginMenu
 
 credential_buttons = [
     PluginMenuButton(
         link="plugins:netdoc:credential_add",
         title="Add",
         icon_class="mdi mdi-plus-thick",
-        color=ButtonColorChoices.GREEN,
     ),
     PluginMenuButton(
         link="plugins:netdoc:credential_import",
         title="Import",
         icon_class="mdi mdi-upload",
-        color=ButtonColorChoices.CYAN,
     ),
 ]
 
@@ -27,7 +24,6 @@ diagram_buttons = [
         link="plugins:netdoc:diagram_add",
         title="Add",
         icon_class="mdi mdi-plus-thick",
-        color=ButtonColorChoices.GREEN,
     ),
 ]
 
@@ -36,13 +32,11 @@ discoverable_buttons = [
         link="plugins:netdoc:discoverable_add",
         title="Add",
         icon_class="mdi mdi-plus-thick",
-        color=ButtonColorChoices.GREEN,
     ),
     PluginMenuButton(
         link="plugins:netdoc:discoverable_import",
         title="Import",
         icon_class="mdi mdi-upload",
-        color=ButtonColorChoices.CYAN,
     ),
 ]
 
@@ -80,7 +74,7 @@ menu_tables = (
     PluginMenuItem(
         link="plugins:netdoc:routetableentry_list",
         link_text="Routing Table",
-        permissions=["netdoc.view_routingtableentry"],
+        permissions=["netdoc.view_routetableentry"],
     ),
 )
 

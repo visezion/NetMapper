@@ -29,11 +29,32 @@ from netbox.forms import (
 
 from netdoc.models import (
     Credential,
+    Diagram,
     Discoverable,
     DiscoveryLog,
     DiscoveryModeChoices,
     DiagramModeChoices,
 )
+
+
+def _coerce_nullable_boolean(value):
+    """Convert a form choice into True, False, or None."""
+    if value in (True, "True", "true", "1", 1):
+        return True
+    if value in (False, "False", "false", "0", 0):
+        return False
+    return None
+
+
+def nullable_boolean_field(**kwargs):
+    """Return a three-state boolean select compatible with current Django versions."""
+    kwargs.setdefault("required", False)
+    return forms.TypedChoiceField(
+        choices=BOOLEAN_WITH_BLANK_CHOICES,
+        coerce=_coerce_nullable_boolean,
+        empty_value=None,
+        **kwargs,
+    )
 
 #
 # Credential forms
@@ -120,7 +141,7 @@ class DiagramForm(NetBoxModelForm):
     class Meta:
         """Form metadata."""
 
-        model = Credential
+        model = Diagram
         fields = [
             "name",
             "mode",
@@ -217,9 +238,8 @@ class DiscoverableBulkEditForm(NetBoxModelBulkEditForm):
         widget=forms.Select(),
         help_text="Discovery mode",
     )
-    discoverable = forms.NullBooleanField(
+    discoverable = nullable_boolean_field(
         help_text="Is discoverable?",
-        required=False,
     )
     site = forms.ModelChoiceField(
         queryset=Site.objects.all(),
@@ -229,17 +249,15 @@ class DiscoverableBulkEditForm(NetBoxModelBulkEditForm):
     )
 
     model = Discoverable
-    nullable_fields = "device"
+    nullable_fields = ["device"]
 
 
 class DiscoverableListFilterForm(NetBoxModelFilterSetForm):
     """Form used to filter Discoverable using parameters. Used in DiscoverableListView."""
 
     model = Discoverable
-    discoverable = forms.NullBooleanField(
-        required=False,
+    discoverable = nullable_boolean_field(
         label="Is discoverable?",
-        widget=forms.Select(choices=BOOLEAN_WITH_BLANK_CHOICES),
     )
     mode = forms.ChoiceField(
         choices=DiscoveryModeChoices,
@@ -266,28 +284,18 @@ class DiscoveryLogListFilterForm(NetBoxModelFilterSetForm):
         widget=APISelect(api_url="/api/virtualization/virtual-machines/"),
         label="Associated VM",
     )
-    configuration = forms.NullBooleanField(
-        required=False,
+    configuration = nullable_boolean_field(
         label="Configuration output",
-        widget=forms.Select(choices=BOOLEAN_WITH_BLANK_CHOICES),
     )
-    success = forms.NullBooleanField(
-        required=False,
+    success = nullable_boolean_field(
         label="Completed successfully",
-        widget=forms.Select(choices=BOOLEAN_WITH_BLANK_CHOICES),
     )
-    supported = forms.NullBooleanField(
-        required=False,
+    supported = nullable_boolean_field(
         label="Command is supported",
-        widget=forms.Select(choices=BOOLEAN_WITH_BLANK_CHOICES),
     )
-    parsed = forms.NullBooleanField(
-        required=False,
+    parsed = nullable_boolean_field(
         label="Parsed successfully",
-        widget=forms.Select(choices=BOOLEAN_WITH_BLANK_CHOICES),
     )
-    ingested = forms.NullBooleanField(
-        required=False,
+    ingested = nullable_boolean_field(
         label="Ingested successfully",
-        widget=forms.Select(choices=BOOLEAN_WITH_BLANK_CHOICES),
     )

@@ -22,10 +22,12 @@ from netmiko.utilities import get_structured_data
 from textfsm.parser import TextFSMError
 
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.models import User
 from django.db.models import Q
 
 from core.models import Job
+from dcim.models import MACAddress
 from extras.models import ScriptModule
 from extras.scripts import run_script
 from utilities.utils import NetBoxFakeRequest
@@ -967,6 +969,49 @@ def object_update(obj, force=True, **kwargs):
 
     if updated:
         obj.save()
+    return obj
+
+
+def sync_primary_mac_address(obj, mac_address=None):
+    """Create/update the primary MAC object assigned to an interface-like model."""
+    current_primary = getattr(obj, "primary_mac_address", None)
+
+    if not mac_address:
+        if current_primary is not None:
+            setattr(obj, "primary_mac_address", None)
+            obj.save(update_fields=["primary_mac_address"])
+            current_primary.delete()
+        return obj
+
+    if (
+        current_primary is not None
+        and str(current_primary.mac_address) == str(mac_address)
+    ):
+        return obj
+
+    content_type = ContentType.objects.get_for_model(obj.__class__)
+    mac_address_o = MACAddress.objects.filter(
+        mac_address=mac_address,
+        assigned_object_type=content_type,
+        assigned_object_id=obj.pk,
+    ).first()
+
+    if mac_address_o is None:
+        if current_primary is not None:
+            current_primary.mac_address = mac_address
+            current_primary.save()
+            mac_address_o = current_primary
+        else:
+            mac_address_o = MACAddress.objects.create(
+                mac_address=mac_address,
+                assigned_object_type=content_type,
+                assigned_object_id=obj.pk,
+            )
+
+    if getattr(obj, "primary_mac_address_id", None) != mac_address_o.pk:
+        setattr(obj, "primary_mac_address", mac_address_o)
+        obj.save(update_fields=["primary_mac_address"])
+
     return obj
 
 

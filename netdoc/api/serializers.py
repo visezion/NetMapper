@@ -45,6 +45,7 @@ class CredentialSerializer(NetBoxModelSerializer):
 
         model = Credential
         fields = "__all__"
+        brief_fields = ("id", "url", "display", "name")
 
 
 class DiagramSerializer(NetBoxModelSerializer):
@@ -60,6 +61,7 @@ class DiagramSerializer(NetBoxModelSerializer):
 
         model = Diagram
         fields = "__all__"
+        brief_fields = ("id", "url", "display", "name", "mode")
 
 
 class DiscoverableSerializer(NetBoxModelSerializer):
@@ -74,6 +76,7 @@ class DiscoverableSerializer(NetBoxModelSerializer):
 
         model = Discoverable
         fields = "__all__"
+        brief_fields = ("id", "url", "display", "address", "mode")
 
 
 class DiscoveryLogSerializer(NetBoxModelSerializer):
@@ -88,6 +91,7 @@ class DiscoveryLogSerializer(NetBoxModelSerializer):
 
         model = DiscoveryLog
         fields = "__all__"
+        brief_fields = ("id", "url", "display", "command", "template")
 
 
 class MacAddressTableEntrySerializer(NetBoxModelSerializer):

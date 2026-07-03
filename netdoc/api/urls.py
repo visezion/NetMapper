@@ -8,7 +8,7 @@ from netbox.api.routers import NetBoxRouter
 from netdoc.api import views
 
 
-app_name = "nedoc"  # pylint: disable=invalid-name
+app_name = "netdoc-api"  # pylint: disable=invalid-name
 
 router = NetBoxRouter()
 router.register("credential", views.CredentialViewSet)
