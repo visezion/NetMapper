@@ -10,7 +10,7 @@ __license__ = "GPLv3"
 Add "Discover Selected" button to the generic template.
 {% endcomment %}
 {% block bulk_buttons %}
-    {% if "bulk_discover" in actions %}
+    {% if "bulk_discover" in action_names %}
         <button type="submit"
                 name="_discover"
                 formaction="{% url "plugins:netdoc:discoverable_bulk_discover" %}?return_url={% url "plugins:netdoc:discoverable_list" %}"
@@ -18,10 +18,10 @@ Add "Discover Selected" button to the generic template.
             <i class="mdi mdi-refresh" aria-hidden="true"></i> Discover Selected
         </button>
     {% endif %}
-    {% if "bulk_edit" in actions %}
+    {% if "bulk_edit" in action_names %}
         {% bulk_edit_button model query_params=request.GET %}
     {% endif %}
-    {% if "bulk_delete" in actions %}
+    {% if "bulk_delete" in action_names %}
         {% bulk_delete_button model query_params=request.GET %}
     {% endif %}
 {% endblock bulk_buttons %}

@@ -5,16 +5,19 @@ COPY . /opt/netbox/netdoc-source
 RUN apt-get update
 RUN apt-get -y install git
 RUN git clone --depth=1 https://github.com/networktocode/ntc-templates /opt/ntc-templates
-RUN /opt/netbox/venv/bin/pip install --no-warn-script-location -r /tmp/plugin_requirements.txt
-RUN /opt/netbox/venv/bin/pip uninstall -y netdoc || true
+RUN if grep -Eq '^[[:space:]]*[^#[:space:]]' /tmp/plugin_requirements.txt; then \
+        uv pip install --python /opt/netbox/venv/bin/python --system -r /tmp/plugin_requirements.txt; \
+    fi
+RUN uv pip uninstall --python /opt/netbox/venv/bin/python --system netdoc || true
 RUN find /opt/netbox/venv/lib -path "*/site-packages/netdoc*" -exec rm -rf {} +
 RUN find /opt/netbox/venv/lib -path "*/site-packages/__editable__.*netdoc*" -delete
 RUN find /opt/netbox/venv/lib -path "*/site-packages/netdoc.egg-link" -delete
-RUN /opt/netbox/venv/bin/pip install --no-warn-script-location --no-deps /opt/netbox/netdoc-source
+RUN uv pip install --python /opt/netbox/venv/bin/python --system /opt/netbox/netdoc-source
+RUN uv pip install --python /opt/netbox/venv/bin/python --system setuptools==80.9.0
 RUN SITE_PACKAGES=$(/opt/netbox/venv/bin/python -c "import site; print(site.getsitepackages()[0])") && \
     rm -rf "$SITE_PACKAGES/netdoc" && \
     cp -r /opt/netbox/netdoc-source/netdoc "$SITE_PACKAGES/netdoc"
-RUN /opt/netbox/venv/bin/python -c "import pathlib, netdoc; print(netdoc.__file__); source = pathlib.Path(netdoc.__file__).read_text(); assert 'getattr(extras_models, \"ReportModule\", None)' in source, netdoc.__file__"
+RUN /opt/netbox/venv/bin/python -c "import pathlib, site; path = pathlib.Path(site.getsitepackages()[0]) / 'netdoc' / '__init__.py'; print(path); source = path.read_text(); assert 'getattr(extras_models, \"ReportModule\", None)' in source, path"
 
 # These lines are only required if your plugin has its own static files.
 COPY docker/configuration/configuration.py /etc/netbox/config/configuration.py

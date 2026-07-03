@@ -13,7 +13,7 @@ credential_buttons = [
         icon_class="mdi mdi-plus-thick",
     ),
     PluginMenuButton(
-        link="plugins:netdoc:credential_import",
+        link="plugins:netdoc:credential_bulk_import",
         title="Import",
         icon_class="mdi mdi-upload",
     ),
@@ -34,7 +34,7 @@ discoverable_buttons = [
         icon_class="mdi mdi-plus-thick",
     ),
     PluginMenuButton(
-        link="plugins:netdoc:discoverable_import",
+        link="plugins:netdoc:discoverable_bulk_import",
         title="Import",
         icon_class="mdi mdi-upload",
     ),

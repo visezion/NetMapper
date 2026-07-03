@@ -81,6 +81,8 @@ def count_interface_neighbors(neighbors_list, key):
     neighbors_per_interface = {}
     for item in neighbors_list:
         label = normalize_interface_label(item.get(key))
+        if not label:
+            continue
         if label not in neighbors_per_interface:
             neighbors_per_interface[label] = 0
         neighbors_per_interface[label] += 1
@@ -463,6 +465,8 @@ def normalize_interface_duplex(duplex):
 
 def normalize_interface_label(name):
     """Given an interface name, return the shortname (label)."""
+    if not name:
+        return None
     name = name.lower().strip()
     if re.match(r".*-trk\d*$", name):
         # HPE Procurve add -Trk1 to interface port name

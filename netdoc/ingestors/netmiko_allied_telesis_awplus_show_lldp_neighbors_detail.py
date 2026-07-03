@@ -36,7 +36,7 @@ def ingest(log):
             # Skip neighbors not announcing a valid interface
             continue
 
-        if neighbors_per_interface.get(local_interface_label) > 1:
+        if neighbors_per_interface.get(local_interface_label, 0) > 1:
             # Skip interfaces with multiple neighbors
             continue
 

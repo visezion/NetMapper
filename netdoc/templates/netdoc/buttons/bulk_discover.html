@@ -1,0 +1,12 @@
+{% comment %}
+__author__ = "Andrea Dainese"
+__contact__ = "andrea@adainese.it"
+__copyright__ = "Copyright 2022, Andrea Dainese"
+__license__ = "GPLv3"
+{% endcomment %}
+<button type="submit"
+        name="_discover"
+        formaction="{{ url }}{% if url_params %}?{{ url_params.urlencode }}{% endif %}"
+        class="btn btn-secondary">
+    <span class="mdi mdi-refresh" aria-hidden="true"></span>&nbsp;{{ label }}
+</button>

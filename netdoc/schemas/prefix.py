@@ -7,10 +7,18 @@ __license__ = "GPLv3"
 import ipaddress
 from jsonschema import validate, FormatChecker
 
-from dcim.models import Site
 from ipam.models import Prefix, VRF
 
 from netdoc import utils
+
+
+def get_prefix_field_names():
+    """Return the concrete Prefix model field names."""
+    field_names = set()
+    for field in Prefix._meta.concrete_fields:
+        field_names.add(field.name)
+        field_names.add(getattr(field, "attname", field.name))
+    return field_names
 
 
 def get_schema():
@@ -18,17 +26,13 @@ def get_schema():
     return {
         "type": "object",
         "properties": {
-            "prefix": {
-                "type": "string",
-            },
-            "vrf_id": {
-                "type": "integer",
-                "enum": list(VRF.objects.all().values_list("id", flat=True)),
-            },
-            "site_id": {
-                "type": "integer",
-                "enum": list(Site.objects.all().values_list("id", flat=True)),
-            },
+        "prefix": {
+            "type": "string",
+        },
+        "vrf_id": {
+            "type": "integer",
+            "enum": list(VRF.objects.all().values_list("id", flat=True)),
+        },
         },
     }
 
@@ -58,9 +62,14 @@ def address_to_network(address):
 def create(prefix=None, **kwargs):
     """Create an Prefix."""
     prefix = address_to_network(prefix)
+    allowed_fields = get_prefix_field_names()
     data = {
         "prefix": prefix,
-        **kwargs,
+        **{
+            key: value
+            for key, value in kwargs.items()
+            if key in allowed_fields and key != "site_id"
+        },
     }
     if prefix.endswith("/32"):
         # Don't create /32 prefixes

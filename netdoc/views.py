@@ -14,12 +14,31 @@ from django.urls import reverse
 from django.http import HttpResponse
 
 from utilities.forms import ConfirmationForm
-from utilities.htmx import is_htmx
+from utilities.htmx import htmx_partial
 from utilities.permissions import get_permission_for_model
 from utilities.views import get_viewname
+from netbox.object_actions import (
+    AddObject,
+    BulkDelete,
+    BulkEdit,
+    BulkExport,
+    BulkImport,
+    ObjectAction,
+)
 from netbox.views import generic
 
 from netdoc import models, tables, forms, filtersets, utils, topologies
+
+
+class BulkDiscoverAction(ObjectAction):
+    """Bulk discovery action for Discoverable list views."""
+
+    name = "bulk_discover"
+    label = "Discover Selected"
+    multi = True
+    permissions_required = {"change"}
+    template_name = "netdoc/buttons/bulk_discover.html"
+
 
 #
 # ARPEntry views
@@ -34,9 +53,7 @@ class ArpTableListView(generic.ObjectListView):
     )
     table = tables.ArpTableEntryTable
     filterset = filtersets.ArpTableEntryFilterSet
-    actions = {
-        "export": set(),
-    }
+    actions = (BulkExport,)
 
 
 class ArpTableView(generic.ObjectView):
@@ -77,11 +94,7 @@ class CredentialListView(generic.ObjectListView):
     ).order_by("name")
     table = tables.CredentialTable
     filterset = filtersets.CredentialFilterSet
-    actions = {
-        "add": {"add"},
-        "import": {"add"},
-        "bulk_delete": {"delete"},
-    }
+    actions = (AddObject, BulkImport, BulkDelete)
 
 
 class CredentialView(generic.ObjectView):
@@ -248,18 +261,16 @@ class DiscoverableListView(generic.ObjectListView):
         discoverylogs_count=Count("discoverylogs")
     ).order_by("device__name", "address")
     table = tables.DiscoverableTable
-    actions = {
-        "add": {"add"},
-        "import": {"add"},
-        "export": set(),
-        "discover": {"change"},
-        "bulk_edit": {"change"},
-        "bulk_delete": {"delete"},
-        "bulk_discover": {"change"},
-    }
+    actions = (AddObject, BulkImport, BulkExport, BulkEdit, BulkDelete, BulkDiscoverAction)
     template_name = "netdoc/discoverable_list.html"
     filterset = filtersets.DiscoverableFilterSet
     filterset_form = forms.DiscoverableListFilterForm
+
+    def get_extra_context(self, request):
+        """Expose action names for the custom bulk action template override."""
+        return {
+            "action_names": {action.name for action in self.get_permitted_actions(request.user)}
+        }
 
 
 class DiscoverableView(generic.ObjectView):
@@ -345,7 +356,7 @@ class DiscoverableDiscoverView(generic.ObjectDeleteView):
         form = ConfirmationForm(initial=request.GET)
 
         # If this is an HTMX request, return only the rendered deletion form as modal content
-        if is_htmx(request):
+        if htmx_partial(request):
             # Called from DiscoverableView
             viewname = get_viewname(self.queryset.model, action="discover")
             form_url = reverse(viewname, kwargs={"pk": obj.pk})
@@ -505,9 +516,7 @@ class DiscoveryLogListView(generic.ObjectListView):
     table = tables.DiscoveryLogTable
     filterset = filtersets.DiscoveryLogFilterSet
     filterset_form = forms.DiscoveryLogListFilterForm
-    actions = {
-        "bulk_delete": {"delete"},
-    }
+    actions = (BulkDelete,)
 
 
 class DiscoveryLogView(generic.ObjectView):
@@ -563,9 +572,7 @@ class MacAddressTableListView(generic.ObjectListView):
     )
     table = tables.MacAddressTableEntryTable
     filterset = filtersets.MacAddressTableEntryFilterSet
-    actions = {
-        "export": set(),
-    }
+    actions = (BulkExport,)
 
 
 class MacAddressTableView(generic.ObjectView):
@@ -607,9 +614,7 @@ class RouteTableEntryListView(generic.ObjectListView):
     )
     table = tables.RouteTableEntryTable
     filterset = filtersets.RouteTableEntryFilterSet
-    actions = {
-        "export": set(),
-    }
+    actions = (BulkExport,)
 
 
 class RouteTableEntryView(generic.ObjectView):

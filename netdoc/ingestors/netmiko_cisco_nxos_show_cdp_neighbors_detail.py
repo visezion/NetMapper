@@ -24,7 +24,7 @@ def ingest(log):
         remote_interface_name = item.get("remote_port")
         remote_interface_label = utils.normalize_interface_label(remote_interface_name)
 
-        if neighbors_per_interface.get(local_interface_label) > 1:
+        if neighbors_per_interface.get(local_interface_label, 0) > 1:
             # Skip interfaces with multiple neighbors
             continue
 

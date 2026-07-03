@@ -24,7 +24,7 @@ urlpatterns = (
     path(
         "credential/import/",
         views.CredentialBulkImportView.as_view(),
-        name="credential_import",
+        name="credential_bulk_import",
     ),
     path(
         "credential/edit/",
@@ -94,7 +94,7 @@ urlpatterns = (
     path(
         "discoverable/import/",
         views.DiscoverableBulkImportView.as_view(),
-        name="discoverable_import",
+        name="discoverable_bulk_import",
     ),
     path(
         "discoverable/edit/",
