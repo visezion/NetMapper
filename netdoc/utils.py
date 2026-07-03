@@ -43,11 +43,21 @@ def append_nornir_netmiko_tasks(
     task, commands, enable=True, filters=None, filter_type=None, order=None
 ):
     """Apply filter to command lists and append to Nornir tasks."""
+    if len(commands) == 1 and isinstance(commands[0], (list, tuple)):
+        first_item = commands[0]
+        if first_item and isinstance(first_item[0], (list, tuple)):
+            commands = first_item
+
     if order is None:
         order = 0
     for command in commands:
+        if not isinstance(command, (list, tuple)) or len(command) < 1:
+            raise ValueError(f"Invalid discovery command definition: {command!r}")
         cmd_line = command[0]
         template = command[1] if command[1] else cmd_line
+
+        if not isinstance(cmd_line, str):
+            raise ValueError(f"Invalid discovery command line: {command!r}")
 
         if template == "HOSTNAME":
             # HOSTNAME is always included
@@ -148,12 +158,34 @@ def get_diagram_interfaces(
     if not vrfs:
         vrfs = []
 
-    interface_qs = Interface.objects.all()
+    interface_qs = (
+        Interface.objects.select_related(
+            "device",
+            "device__device_type",
+            "device__role",
+            "device__site",
+            "device__location",
+            "vrf",
+            "cable",
+        )
+        .prefetch_related("ip_addresses", "cable__terminations__interface")
+        .all()
+    )
     if sites:
         interface_qs = interface_qs.filter(device__site_id__in=sites)
     if roles:
         interface_qs = interface_qs.filter(device__role_id__in=roles)
-    virtual_interface_qs = VMInterface.objects.all()
+    virtual_interface_qs = (
+        VMInterface.objects.select_related(
+            "virtual_machine",
+            "virtual_machine__role",
+            "virtual_machine__site",
+            "virtual_machine__cluster",
+            "vrf",
+        )
+        .prefetch_related("ip_addresses")
+        .all()
+    )
     if sites:
         virtual_interface_qs = virtual_interface_qs.filter(
             virtual_machine__site_id__in=sites
@@ -200,7 +232,7 @@ def get_diagram_interfaces(
         # Not using virtual interfaces on site diagrams
         virtual_interface_qs = VMInterface.objects.none()
 
-    return list(interface_qs) + list(virtual_interface_qs)
+    return list(interface_qs.distinct()) + list(virtual_interface_qs.distinct())
 
 
 def get_remote_lldp_interface_label(

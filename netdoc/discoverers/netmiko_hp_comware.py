@@ -18,32 +18,30 @@ def discovery(nrni, filters=None, filter_type=None):
     host_list = []
     failed_host_list = []
     # Define commands, in order with command, template, enabled
-    commands = (
-        [
-            ("display current-configuration | include sysname", "HOSTNAME"),
-            ("display current-configuration", None),
-            # Depending on version, "brief" may be unsupportted
-            ("display vlan brief", None),
-            ("display vlan all", None),
-            # Depending on version, "verbose" may be unsupportted
-            ("display lldp neighbor-information verbose", None),
-            ("display lldp neighbor-information list", None),
-            ("display ip vpn-instance", None),
-            ("display interface", None),
-            ("display ip interface", None),
-            ("display mac-address", None),
-            ("display link-aggregation verbose", None),
-            ("display_device_manuinfo", None),
-            # Unsupported
-            ("display version", None),
-            ("display logbuffer level 6", None),
-            ("display stp", None),
-            ("display port trunk", None),
-            ("display vrrp", None),
-            ("display ospf peer", None),
-            ("display bgp peer", None),
-        ],
-    )
+    commands = [
+        ("display current-configuration | include sysname", "HOSTNAME"),
+        ("display current-configuration", None),
+        # Depending on version, "brief" may be unsupportted
+        ("display vlan brief", None),
+        ("display vlan all", None),
+        # Depending on version, "verbose" may be unsupportted
+        ("display lldp neighbor-information verbose", None),
+        ("display lldp neighbor-information list", None),
+        ("display ip vpn-instance", None),
+        ("display interface", None),
+        ("display ip interface", None),
+        ("display mac-address", None),
+        ("display link-aggregation verbose", None),
+        ("display_device_manuinfo", None),
+        # Unsupported
+        ("display version", None),
+        ("display logbuffer level 6", None),
+        ("display stp", None),
+        ("display port trunk", None),
+        ("display vrrp", None),
+        ("display ospf peer", None),
+        ("display bgp peer", None),
+    ]
 
     def multiple_tasks(task):
         """Define commands (in order) for the playbook."""

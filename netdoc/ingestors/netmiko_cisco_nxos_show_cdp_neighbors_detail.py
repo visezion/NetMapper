@@ -4,6 +4,8 @@ __contact__ = "andrea@adainese.it"
 __copyright__ = "Copyright 2022, Andrea Dainese"
 __license__ = "GPLv3"
 
+from collections import Counter
+
 from netdoc.schemas import interface, device, discoverable, cable
 from netdoc import utils
 
@@ -11,20 +13,32 @@ from netdoc import utils
 def ingest(log):
     """Processing parsed output."""
     device_o = log.discoverable.device
-    neighbors_per_interface = utils.count_interface_neighbors(
-        log.parsed_output, "local_port"
+    neighbors_per_interface = Counter(
+        utils.normalize_interface_label(
+            item.get("local_port") or item.get("local_interface")
+        )
+        for item in log.parsed_output
+        if utils.normalize_interface_label(
+            item.get("local_port") or item.get("local_interface")
+        )
     )
 
     for item in log.parsed_output:
         # See https://github.com/networktocode/ntc-templates/tree/master/tests/cisco_nxos/show_cdp_neighbors_detail # pylint: disable=line-too-long
-        local_interface_name = item.get("local_port")
+        local_interface_name = item.get("local_port") or item.get("local_interface")
         local_interface_label = utils.normalize_interface_label(local_interface_name)
-        remote_management_ip = utils.normalize_ip_address_or_none(item.get("mgmt_ip"))
-        remote_name = utils.get_remote_device_name(
-            item.get("dest_host"), remote_management_ip
+        remote_management_ip = utils.normalize_ip_address_or_none(
+            item.get("mgmt_ip") or item.get("mgmt_address")
         )
-        remote_interface_name = item.get("remote_port")
+        remote_name = utils.get_remote_device_name(
+            item.get("dest_host") or item.get("neighbor_name"),
+            remote_management_ip,
+        )
+        remote_interface_name = item.get("remote_port") or item.get("neighbor_interface")
         remote_interface_label = utils.normalize_interface_label(remote_interface_name)
+
+        if not local_interface_label or not remote_interface_label:
+            continue
 
         if neighbors_per_interface.get(local_interface_label, 0) > 1:
             # Skip interfaces with multiple neighbors

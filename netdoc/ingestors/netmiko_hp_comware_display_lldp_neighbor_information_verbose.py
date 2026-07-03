@@ -31,6 +31,9 @@ def ingest(log):
             system_description=None,
         )
 
+        if not local_interface_label:
+            continue
+
         if not utils.is_hostname(remote_name):
             # Skip neighbors not announcing a valid hostname
             continue
