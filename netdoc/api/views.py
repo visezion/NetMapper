@@ -8,10 +8,13 @@ from netbox.api.viewsets import NetBoxModelViewSet
 
 from netdoc import models, filtersets
 from netdoc.api.serializers import (
+    ArpTableEntrySerializer,
     CredentialSerializer,
     DiscoverableSerializer,
     DiscoveryLogSerializer,
     DiagramSerializer,
+    MacAddressTableEntrySerializer,
+    RouteTableEntrySerializer,
 )
 
 
@@ -21,6 +24,14 @@ class CredentialViewSet(NetBoxModelViewSet):
     queryset = models.Credential.objects.prefetch_related("tags")
     serializer_class = CredentialSerializer
     filterset_class = filtersets.CredentialFilterSet
+
+
+class ArpTableEntryViewSet(NetBoxModelViewSet):
+    """API View for ARP table entries."""
+
+    queryset = models.ArpTableEntry.objects.prefetch_related("tags")
+    serializer_class = ArpTableEntrySerializer
+    filterset_class = filtersets.ArpTableEntryFilterSet
 
 
 class DiagramViewSet(NetBoxModelViewSet):
@@ -44,3 +55,19 @@ class DiscoveryLogViewSet(NetBoxModelViewSet):
     queryset = models.DiscoveryLog.objects.prefetch_related("tags")
     serializer_class = DiscoveryLogSerializer
     filterset_class = filtersets.DiscoveryLogFilterSet
+
+
+class MacAddressTableEntryViewSet(NetBoxModelViewSet):
+    """API View for MAC address table entries."""
+
+    queryset = models.MacAddressTableEntry.objects.prefetch_related("tags")
+    serializer_class = MacAddressTableEntrySerializer
+    filterset_class = filtersets.MacAddressTableEntryFilterSet
+
+
+class RouteTableEntryViewSet(NetBoxModelViewSet):
+    """API View for route table entries."""
+
+    queryset = models.RouteTableEntry.objects.prefetch_related("tags")
+    serializer_class = RouteTableEntrySerializer
+    filterset_class = filtersets.RouteTableEntryFilterSet

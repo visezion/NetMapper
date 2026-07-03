@@ -20,16 +20,18 @@ from netdoc.models import (
 
 
 class ArpTableEntrySerializer(NetBoxModelSerializer):
-    """Serializer to validate ArpTableEntry data.
+    """Serializer to validate ArpTableEntry data."""
 
-    No need to view-details/edit/delete, so url and View are missing.
-    """
+    url = serializers.HyperlinkedIdentityField(
+        view_name="plugins-api:netdoc-api:arptableentry-detail"
+    )
 
     class Meta:
         """Serializer metadata."""
 
         model = ArpTableEntry
         fields = "__all__"
+        brief_fields = ("id", "url", "display", "ip_address", "mac_address")
 
 
 class CredentialSerializer(NetBoxModelSerializer):
@@ -95,26 +97,30 @@ class DiscoveryLogSerializer(NetBoxModelSerializer):
 
 
 class MacAddressTableEntrySerializer(NetBoxModelSerializer):
-    """Serializer to validate MacAddressTableEntry data.
+    """Serializer to validate MacAddressTableEntry data."""
 
-    No need to view-details/edit/delete, so url and View are missing.
-    """
+    url = serializers.HyperlinkedIdentityField(
+        view_name="plugins-api:netdoc-api:macaddresstableentry-detail"
+    )
 
     class Meta:
         """Serializer metadata."""
 
         model = MacAddressTableEntry
         fields = "__all__"
+        brief_fields = ("id", "url", "display", "mac_address", "vvid")
 
 
 class RouteTableEntrySerializer(NetBoxModelSerializer):
-    """Serializer to validate RouteTableEntry data.
+    """Serializer to validate RouteTableEntry data."""
 
-    No need to view-details/edit/delete, so url and View are missing.
-    """
+    url = serializers.HyperlinkedIdentityField(
+        view_name="plugins-api:netdoc-api:routetableentry-detail"
+    )
 
     class Meta:
         """Serializer metadata."""
 
         model = RouteTableEntry
         fields = "__all__"
+        brief_fields = ("id", "url", "display", "destination", "protocol")

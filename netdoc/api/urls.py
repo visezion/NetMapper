@@ -11,9 +11,12 @@ from netdoc.api import views
 app_name = "netdoc-api"  # pylint: disable=invalid-name
 
 router = NetBoxRouter()
+router.register("arptableentry", views.ArpTableEntryViewSet)
 router.register("credential", views.CredentialViewSet)
 router.register("diagram", views.DiagramViewSet)
 router.register("discoverylog", views.DiscoveryLogViewSet)
 router.register("discoverable", views.DiscoverableViewSet)
+router.register("macaddresstableentry", views.MacAddressTableEntryViewSet)
+router.register("routetableentry", views.RouteTableEntryViewSet)
 
 urlpatterns = router.urls
