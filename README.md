@@ -10,6 +10,29 @@ Compatibility:
 * Historical NetDoc 3.5.x targeted NetBox 3.5.x.
 * Historical NetDoc 0.10.x targeted NetBox 3.4.x.
 
+## Server deploy flow
+
+When deploying with `netbox-docker`, make sure the server updates the NetDoc repository before starting the image build. A simple server-side flow is:
+
+```bash
+cd /path/to/netdoc
+./scripts/deploy_netbox_docker.sh
+```
+
+The script:
+
+* runs `git fetch --all --prune`
+* updates the checked out branch using `git pull --ff-only`
+* rebuilds the NetBox plugin image with `--no-cache`
+* restarts `netbox`, `netbox-worker`, and `netbox-housekeeping`
+* prints the latest `netbox` container logs
+
+If you want to deploy a specific branch, pass it as the first argument:
+
+```bash
+./scripts/deploy_netbox_docker.sh main
+```
+
 ## Table of contents
 
 1. [Introduction](https://github.com/dainok/netdoc/wiki "Introduction")

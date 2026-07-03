@@ -10,8 +10,8 @@ RUN /opt/netbox/venv/bin/pip uninstall -y netdoc || true
 RUN find /opt/netbox/venv/lib -path "*/site-packages/netdoc*" -exec rm -rf {} +
 RUN find /opt/netbox/venv/lib -path "*/site-packages/__editable__.*netdoc*" -delete
 RUN find /opt/netbox/venv/lib -path "*/site-packages/netdoc.egg-link" -delete
-RUN /opt/netbox/venv/bin/pip install --no-warn-script-location --no-deps -e /opt/netbox/netdoc-source
-RUN /opt/netbox/venv/bin/python -c "import netdoc; print(netdoc.__file__); assert netdoc.__file__.startswith('/opt/netbox/netdoc-source/'), netdoc.__file__"
+RUN /opt/netbox/venv/bin/pip install --no-warn-script-location --no-deps /opt/netbox/netdoc-source
+RUN /opt/netbox/venv/bin/python -c "import pathlib, netdoc; print(netdoc.__file__); source = pathlib.Path(netdoc.__file__).read_text(); assert 'getattr(extras_models, \"ReportModule\", None)' in source, netdoc.__file__"
 
 # These lines are only required if your plugin has its own static files.
 COPY docker/configuration/configuration.py /etc/netbox/config/configuration.py
