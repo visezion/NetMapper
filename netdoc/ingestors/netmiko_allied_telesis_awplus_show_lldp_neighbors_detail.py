@@ -21,7 +21,9 @@ def ingest(log):
         remote_management_ip = utils.normalize_ip_address_or_none(
             item.get("management_ip")
         )
-        remote_name = utils.normalize_hostname(item.get("neighbor"))
+        remote_name = utils.get_remote_device_name(
+            item.get("neighbor"), remote_management_ip
+        )
         remote_interface_label = utils.get_remote_lldp_interface_label(
             port_id=item.get("neighbor_port_id"),
             port_description=item.get("neighbor_port_description"),
@@ -56,6 +58,9 @@ def ingest(log):
                 "device_id": device_o.id,
             }
             local_interface_o = interface.create(**local_interface_data)
+
+        if not remote_name:
+            continue
 
         # Get or create remote Device
         remote_device_o = device.get(remote_name)

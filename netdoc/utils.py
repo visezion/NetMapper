@@ -430,6 +430,14 @@ def normalize_hostname(name):
     return name
 
 
+def get_remote_device_name(name=None, management_ip=None):
+    """Return a usable remote device identifier from hostname or management IP."""
+    hostname = normalize_hostname(name)
+    if hostname:
+        return hostname
+    return normalize_ip_address_or_none(management_ip)
+
+
 def normalize_interface_duplex(duplex):
     """Normalize Interface.duplex."""
     if not duplex:
