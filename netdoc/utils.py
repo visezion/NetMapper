@@ -1057,6 +1057,10 @@ def parse_netmiko_output(output, platform, command):
 
 def spawn_script(script_name, get_data=None, post_data=None, file_list=None, user=None):
     """Spawn a Netbox Script defined into scripts folder and return the job_id."""
+    import extras.models as extras_models  # pylint: disable=import-outside-toplevel
+
+    from netdoc import sync_plugin_assets  # pylint: disable=import-outside-toplevel
+
     if not get_data:
         get_data = {}
     if not post_data:
@@ -1081,7 +1085,15 @@ def spawn_script(script_name, get_data=None, post_data=None, file_list=None, use
     )
 
     # Resolve the managed script object and execute it using NetBox's current script job API.
-    _, script = get_module_and_script("netdoc_scripts", script_name)
+    try:
+        _, script = get_module_and_script("netdoc_scripts", script_name)
+    except (
+        extras_models.Script.DoesNotExist,
+        extras_models.ScriptModule.DoesNotExist,
+    ):
+        sync_plugin_assets()
+        _, script = get_module_and_script("netdoc_scripts", script_name)
+
     job = ScriptJob.enqueue(
         instance=script,
         user=request.user,  # pylint: disable=no-member

@@ -13,7 +13,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.http import HttpResponse
 
-from utilities.forms import ConfirmationForm
+from utilities.forms import BulkDeleteForm, ConfirmationForm
 from utilities.htmx import htmx_partial
 from utilities.permissions import get_permission_for_model
 from utilities.views import get_viewname
@@ -452,10 +452,8 @@ class DiscoverableBulkDiscoverView(generic.BulkDeleteView):
         else:
             pk_list = [int(pk) for pk in request.POST.getlist("pk")]
 
-        form_cls = self.get_form()
-
         if "_confirm" in request.POST:
-            form = form_cls(request.POST)
+            form = BulkDeleteForm(model, request.POST)
             if form.is_valid():
                 logger.debug("Form validation was successful")
                 queryset = self.queryset.filter(pk__in=pk_list)
@@ -475,11 +473,12 @@ class DiscoverableBulkDiscoverView(generic.BulkDeleteView):
             logger.debug("Form validation failed")
 
         else:
-            form = form_cls(
+            form = BulkDeleteForm(
+                model,
                 initial={
                     "pk": pk_list,
                     "return_url": self.get_return_url(request),
-                }
+                },
             )
 
         # Retrieve objects being deleted

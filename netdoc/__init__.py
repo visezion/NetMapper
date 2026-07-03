@@ -66,8 +66,7 @@ def sync_plugin_assets():
 
     script_file_o = DataFile.objects.get(path=script_filename)
     try:
-        ScriptModule.objects.get(file_path=script_filename)
-        shutil.copy(f"{jobs_path}/{script_filename}", settings.SCRIPTS_ROOT)
+        script_o = ScriptModule.objects.get(file_path=script_filename)
     except ScriptModule.DoesNotExist:  # pylint: disable=no-member
         script_o = ScriptModule.objects.create(
             auto_sync_enabled=True,
@@ -77,14 +76,22 @@ def sync_plugin_assets():
             file_path=script_filename,
             file_root="scripts",
         )
-        script_o.sync()
-        script_o.save()
+    else:
+        script_o.auto_sync_enabled = True
+        script_o.data_file = script_file_o
+        script_o.data_path = script_filename
+        script_o.data_source = jobs_ds_o
+        script_o.file_path = script_filename
+        script_o.file_root = "scripts"
+
+    shutil.copy(f"{jobs_path}/{script_filename}", settings.SCRIPTS_ROOT)
+    script_o.sync()
+    script_o.save()
 
     if ReportModule is not None:
         report_file_o = DataFile.objects.get(path=report_filename)
         try:
-            ReportModule.objects.get(file_path=report_filename)
-            shutil.copy(f"{jobs_path}/{report_filename}", settings.REPORTS_ROOT)
+            report_o = ReportModule.objects.get(file_path=report_filename)
         except ReportModule.DoesNotExist:  # pylint: disable=no-member
             report_o = ReportModule.objects.create(
                 auto_sync_enabled=True,
@@ -94,8 +101,17 @@ def sync_plugin_assets():
                 file_path=report_filename,
                 file_root="reports",
             )
-            report_o.sync()
-            report_o.save()
+        else:
+            report_o.auto_sync_enabled = True
+            report_o.data_file = report_file_o
+            report_o.data_path = report_filename
+            report_o.data_source = jobs_ds_o
+            report_o.file_path = report_filename
+            report_o.file_root = "reports"
+
+        shutil.copy(f"{jobs_path}/{report_filename}", settings.REPORTS_ROOT)
+        report_o.sync()
+        report_o.save()
 
 
 def sync_plugin_assets_after_migrate(sender, **kwargs):  # pylint: disable=unused-argument
