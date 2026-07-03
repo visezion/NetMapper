@@ -13,7 +13,6 @@ from dcim.models import (
     Interface,
     CablePath,
 )
-from core.models import Job
 from ipam.models import IPAddress, Prefix, VRF, VLAN
 from netdoc.models import (
     ArpTableEntry,
@@ -21,6 +20,11 @@ from netdoc.models import (
     RouteTableEntry,
     DiscoveryLog,
 )
+
+try:
+    from core.models import Job
+except ImportError:
+    Job = None
 
 DELETE_LOGS = False
 
@@ -41,7 +45,8 @@ MacAddressTableEntry.objects.all().delete()
 RouteTableEntry.objects.all().delete()
 VRF.objects.all().delete()
 VLAN.objects.all().delete()
-Job.objects.all().delete()
+if Job is not None:
+    Job.objects.all().delete()
 
 if DELETE_LOGS:
     DiscoveryLog.objects.all().delete()  # Danger

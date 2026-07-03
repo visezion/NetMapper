@@ -8,12 +8,79 @@ import os
 import shutil
 
 from django.conf import settings
+from django.db.models.signals import post_migrate
 
 from netbox.plugins import PluginConfig
 
 PLUGIN_SETTINGS = settings.PLUGINS_CONFIG.get("netdoc", {})
 NTC_TEMPLATES_DIR = PLUGIN_SETTINGS.get("NTC_TEMPLATES_DIR")
 MODULE_PATH = os.path.dirname(__file__)
+
+
+def sync_plugin_assets():
+    """Create/update NetDoc script modules and optional legacy reports."""
+    from core.models import DataSource, DataFile  # pylint: disable=import-outside-toplevel
+    import extras.models as extras_models  # pylint: disable=import-outside-toplevel
+
+    jobs_path = os.path.join(MODULE_PATH, "jobs")
+    script_name = "netdoc_scripts"
+    script_filename = f"{script_name}.py"
+    report_name = "netdoc_reports"
+    report_filename = f"{report_name}.py"
+
+    ScriptModule = extras_models.ScriptModule
+    ReportModule = getattr(extras_models, "ReportModule", None)
+
+    try:
+        jobs_ds_o = DataSource.objects.get(name="netdoc_jobs")
+    except DataSource.DoesNotExist:  # pylint: disable=no-member
+        jobs_ds_o = DataSource.objects.create(
+            name="netdoc_jobs",
+            type="local",
+            source_url=jobs_path,
+        )
+
+    jobs_ds_o.sync()
+
+    script_file_o = DataFile.objects.get(path=script_filename)
+    try:
+        ScriptModule.objects.get(file_path=script_filename)
+        shutil.copy(f"{jobs_path}/{script_filename}", settings.SCRIPTS_ROOT)
+    except ScriptModule.DoesNotExist:  # pylint: disable=no-member
+        script_o = ScriptModule.objects.create(
+            auto_sync_enabled=True,
+            data_file=script_file_o,
+            data_path=script_filename,
+            data_source=jobs_ds_o,
+            file_path=script_filename,
+            file_root="scripts",
+        )
+        script_o.sync()
+        script_o.save()
+
+    if ReportModule is not None:
+        report_file_o = DataFile.objects.get(path=report_filename)
+        try:
+            ReportModule.objects.get(file_path=report_filename)
+            shutil.copy(f"{jobs_path}/{report_filename}", settings.REPORTS_ROOT)
+        except ReportModule.DoesNotExist:  # pylint: disable=no-member
+            report_o = ReportModule.objects.create(
+                auto_sync_enabled=True,
+                data_file=report_file_o,
+                data_path=report_filename,
+                data_source=jobs_ds_o,
+                file_path=report_filename,
+                file_root="reports",
+            )
+            report_o.sync()
+            report_o.save()
+
+
+def sync_plugin_assets_after_migrate(sender, **kwargs):  # pylint: disable=unused-argument
+    """Synchronize NetDoc assets after this plugin's migrations have run."""
+    if getattr(sender, "name", None) != "netdoc":
+        return
+    sync_plugin_assets()
 
 
 class NetdocConfig(PluginConfig):
@@ -34,83 +101,23 @@ class NetdocConfig(PluginConfig):
         "RAISE_ON_CDP_FAIL": True,
         "RAISE_ON_LLDP_FAIL": True,
         "ROLE_MAP": {},
+        "SYNC_ON_STARTUP": False,
     }
 
     def ready(self):
-        """Load signals and create scripts and optional legacy reports."""
-        import sys  # noqa: F401 pylint: disable=import-outside-toplevel,unused-import
+        """Load signals and register asset synchronization hooks."""
 
         from netdoc import (  # noqa: F401 pylint: disable=import-outside-toplevel,unused-import
             signals,
         )
 
-        wsgi = "django.core.wsgi" in sys.modules
+        post_migrate.connect(
+            sync_plugin_assets_after_migrate,
+            dispatch_uid="netdoc.sync_plugin_assets_after_migrate",
+        )
 
-        if "migrate" not in sys.argv and (wsgi or "runserver" in sys.argv):
-            from core.models import (  # noqa: F401 pylint: disable=import-outside-toplevel
-                DataSource,
-                DataFile,
-            )
-            import extras.models as extras_models  # pylint: disable=import-outside-toplevel
-
-            ScriptModule = extras_models.ScriptModule
-
-            # NetBox 4 removed legacy reports. Keep this optional for older NetBox versions.
-            ReportModule = getattr(extras_models, "ReportModule", None)
-
-            # Create/update data source for NetDoc jobs.
-            jobs_path = os.path.join(MODULE_PATH, "jobs")
-            try:
-                jobs_ds_o = DataSource.objects.get(name="netdoc_jobs")
-            except DataSource.DoesNotExist:  # pylint: disable=no-member
-                jobs_ds_o = DataSource.objects.create(
-                    name="netdoc_jobs",
-                    type="local",
-                    source_url=jobs_path,
-                )
-
-            jobs_ds_o.sync()
-
-            # Create/update NetDoc scripts.
-            script_name = "netdoc_scripts"
-            script_filename = f"{script_name}.py"
-            script_file_o = DataFile.objects.get(path=script_filename)
-
-            try:
-                ScriptModule.objects.get(file_path=script_filename)
-                shutil.copy(f"{jobs_path}/{script_filename}", settings.SCRIPTS_ROOT)
-            except ScriptModule.DoesNotExist:  # pylint: disable=no-member
-                script_o = ScriptModule.objects.create(
-                    auto_sync_enabled=True,
-                    data_file=script_file_o,
-                    data_path=script_filename,
-                    data_source=jobs_ds_o,
-                    file_path=script_filename,
-                    file_root="scripts",
-                )
-                script_o.sync()
-                script_o.save()
-
-            # Create/update NetDoc reports only if this NetBox version still supports ReportModule.
-            if ReportModule is not None:
-                report_name = "netdoc_reports"
-                report_filename = f"{report_name}.py"
-                report_file_o = DataFile.objects.get(path=report_filename)
-
-                try:
-                    ReportModule.objects.get(file_path=report_filename)
-                    shutil.copy(f"{jobs_path}/{report_filename}", settings.REPORTS_ROOT)
-                except ReportModule.DoesNotExist:  # pylint: disable=no-member
-                    report_o = ReportModule.objects.create(
-                        auto_sync_enabled=True,
-                        data_file=report_file_o,
-                        data_path=report_filename,
-                        data_source=jobs_ds_o,
-                        file_path=report_filename,
-                        file_root="reports",
-                    )
-                    report_o.sync()
-                    report_o.save()
+        if PLUGIN_SETTINGS.get("SYNC_ON_STARTUP"):
+            sync_plugin_assets()
 
         super().ready()
 

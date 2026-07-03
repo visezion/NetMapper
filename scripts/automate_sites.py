@@ -6,6 +6,16 @@ Usage:
 from dcim.models import Device, Site, DeviceRole
 from netdoc.models import Diagram
 
+
+def update_role(device_o, role_slug):
+    """Set the device role only when it differs."""
+    role_o = DeviceRole.objects.get(slug=role_slug)
+    if not device_o.role or device_o.role.pk != role_o.pk:
+        print("Update role on ", device_o.name)
+        device_o.role = role_o
+        device_o.save()
+
+
 device_qs = Device.objects.all()
 for device_o in device_qs:
     site_name = device_o.name.split("-")[0]
@@ -23,17 +33,9 @@ for device_o in device_qs:
         device_o.save()
 
     if "-ME36-" in device_o.name:
-        role_o = DeviceRole.objects.get(slug="access-switch")
-        if device_o.device_role.pk != role_o.pk:
-            print("Update role on ", device_o.name)
-            device_o.device_role = role_o
-            device_o.save()
+        update_role(device_o, "access-switch")
     if "-ME38-" in device_o.name or "-A9k" in device_o.name:
-        role_o = DeviceRole.objects.get(slug="router")
-        if device_o.device_role.pk != role_o.pk:
-            print("Update role on ", device_o.name)
-            device_o.device_role = role_o
-            device_o.save()
+        update_role(device_o, "router")
 
     # Create site diagram
     diagram_o, created = Diagram.objects.get_or_create(name=diagram_name, mode="l2")

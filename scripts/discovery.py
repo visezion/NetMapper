@@ -1,18 +1,12 @@
-"""Run discovery via RQ.
+"""Run discovery via NetBox's current script job API.
 
 Usage:
 /opt/netbox/venv/bin/python3 /opt/netbox/netbox/manage.py shell < discovery.py
 """
-import uuid
-
-from django.contrib.contenttypes.models import ContentType
-from django.contrib.auth.models import User
-
-from extras.scripts import get_scripts, run_script
-from extras.models import JobResult, Script
-from utilities.utils import NetBoxFakeRequest
+from users.models import User
 
 from netdoc.models import Discoverable
+from netdoc.utils import spawn_script
 
 FILTERS = ["172.25.82.45"]  # List of discoverable IP addresses
 FILTERS = []
@@ -28,29 +22,7 @@ def main():
         else [],
     }
     user = User.objects.filter(is_superuser=True).order_by("pk")[0]
-    script = get_scripts().get("NetDoc").get("Discover")
-    request = NetBoxFakeRequest(
-        {
-            "META": {},
-            "POST": data,
-            "GET": {},
-            "FILES": {},
-            "user": user,
-            "id": uuid.uuid4(),
-        }
-    )
-
-    JobResult.enqueue_job(
-        run_script,
-        name=script.full_name,
-        obj_type=ContentType.objects.get_for_model(Script),
-        user=request.user,  # pylint: disable=no-member
-        schedule_at=None,
-        interval=None,
-        job_timeout=script.job_timeout,
-        data=request.POST,  # pylint: disable=no-member
-        request=request,
-    )
+    spawn_script("Discover", post_data=data, user=user)
 
 
 if __name__ == "django.core.management.commands.shell":

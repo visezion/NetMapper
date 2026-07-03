@@ -23,6 +23,9 @@ The script:
 
 * runs `git fetch --all --prune`
 * updates the checked out branch using `git pull --ff-only`
+* prints the exact Git commit being deployed
+* refuses to deploy from a dirty working tree by default
+* validates the built image can import the expected patched `netdoc`
 * rebuilds the NetBox plugin image with `--no-cache`
 * restarts `netbox`, `netbox-worker`, and `netbox-housekeeping`
 * prints the latest `netbox` container logs
@@ -31,6 +34,12 @@ If you want to deploy a specific branch, pass it as the first argument:
 
 ```bash
 ./scripts/deploy_netbox_docker.sh main
+```
+
+If the server intentionally has uncommitted local changes, you can override the dirty-tree safety check:
+
+```bash
+ALLOW_DIRTY=1 ./scripts/deploy_netbox_docker.sh
 ```
 
 ## Table of contents

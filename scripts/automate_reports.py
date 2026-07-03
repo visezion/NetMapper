@@ -25,14 +25,14 @@ header = [
     "Enabled",
     "Description",
 ]
-interface_qs = Interface.objects.filter(device__device_role_id__in=role_ids).order_by(
+interface_qs = Interface.objects.filter(device__role_id__in=role_ids).order_by(
     "device__site__name", "device__name", "name"
 )
 report_fh = open("report_interface_list.csv", "w", encoding="UTF8")
 csv_writer = csv.writer(report_fh)
 csv_writer.writerow(header)
 for interface_o in interface_qs:
-    lowercase_description = interface_o.description.lower()
+    lowercase_description = (interface_o.description or "").lower()
     int_type = None
     if lowercase_description.startswith("vrf"):
         int_type = "vrf"
@@ -48,7 +48,7 @@ for interface_o in interface_qs:
             [
                 interface_o.device.site.name,
                 interface_o.device.name,
-                interface_o.device.device_role.name,
+                interface_o.device.role.name if interface_o.device.role else None,
                 interface_o.name,
                 int_type,
                 interface_o.enabled,
@@ -63,7 +63,7 @@ header = [
     "Number of devices",
 ]
 site_qs = (
-    Site.objects.filter(devices__device_role_id__in=role_ids)
+    Site.objects.filter(devices__role_id__in=role_ids)
     .annotate(device_count=Count("devices"))
     .filter(device_count__gt=0)
     .order_by("name")
@@ -89,7 +89,7 @@ header = [
     "Manufacturer",
     "Address",
 ]
-device_qs = Device.objects.filter(device_role_id__in=role_ids).order_by("site__name")
+device_qs = Device.objects.filter(role_id__in=role_ids).order_by("site__name")
 report_fh = open("report_device_list.csv", "w", encoding="UTF8")
 csv_writer = csv.writer(report_fh)
 csv_writer.writerow(header)
@@ -102,7 +102,7 @@ for device_o in device_qs:
         [
             device_o.site.name,
             device_o.name,
-            device_o.device_role.name,
+            device_o.role.name if device_o.role else None,
             device_o.device_type.model,
             device_o.device_type.manufacturer.name,
             discoverable_ip,
@@ -133,7 +133,7 @@ vrf_qs = VRF.objects.all().order_by("name")
 vrf_list = list(vrf_qs.values_list("name", flat=True))
 vrf_count = len(vrf_list)
 header = ["Device \\ VRF", "Global"] + vrf_list
-device_qs = Device.objects.filter(device_role_id__in=bb_role_ids).order_by("name")
+device_qs = Device.objects.filter(role_id__in=bb_role_ids).order_by("name")
 report_fh = open("report_device_vrf_routes_matrix.csv", "w", encoding="UTF8")
 csv_writer = csv.writer(report_fh)
 csv_writer.writerow(header)
