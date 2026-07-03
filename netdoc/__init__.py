@@ -31,6 +31,14 @@ def get_ntc_templates_dir():
     )
 
 
+def get_base_dir():
+    """Return NetBox's base directory when available, else fall back locally."""
+    try:
+        return settings.BASE_DIR
+    except ImproperlyConfigured:
+        return MODULE_PATH
+
+
 def sync_plugin_assets():
     """Create/update NetDoc script modules and optional legacy reports."""
     from core.models import DataSource, DataFile  # pylint: disable=import-outside-toplevel
@@ -110,7 +118,7 @@ class NetdocConfig(PluginConfig):
     required_settings = []
     default_settings = {
         "MAX_INGESTED_LOGS": 25,
-        "NORNIR_LOG": f"{settings.BASE_DIR}/nornir.log",
+        "NORNIR_LOG": os.path.join(get_base_dir(), "nornir.log"),
         "NORNIR_TIMEOUT": 300,
         "RAISE_ON_CDP_FAIL": True,
         "RAISE_ON_LLDP_FAIL": True,
