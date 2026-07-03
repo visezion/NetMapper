@@ -1022,6 +1022,8 @@ def parent_interface(label, return_label=True):
     """If subinterface return parent interface else return None."""
     if return_label:
         label = normalize_interface_label(label)
+    if not label:
+        return None
     if re.match(r"^[^.]+\.[0-9]+$", label):
         # Contains only one "." and ends with numbers
         parent_label = re.sub(r".[0-9]+$", "", label)
