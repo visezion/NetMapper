@@ -1,1 +1,2 @@
-netdoc
+# Third-party requirements for the image.
+# The local NetDoc checkout is installed explicitly in Dockerfile-Plugins.

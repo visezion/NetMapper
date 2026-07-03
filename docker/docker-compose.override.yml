@@ -6,22 +6,21 @@
 # docker-compose build --no-cache
 # docker-compose up -d
 
-version: '3.4'
 services:
   netbox:
     ports:
       - 8000:8080
     build:
-      context: .
-      dockerfile: Dockerfile-Plugins
+      context: ..
+      dockerfile: docker/Dockerfile-Plugins
     image: netbox:latest-plugins
   netbox-worker:
     image: netbox:latest-plugins
     build:
-      context: .
-      dockerfile: Dockerfile-Plugins
+      context: ..
+      dockerfile: docker/Dockerfile-Plugins
   netbox-housekeeping:
     image: netbox:latest-plugins
     build:
-      context: .
-      dockerfile: Dockerfile-Plugins
+      context: ..
+      dockerfile: docker/Dockerfile-Plugins

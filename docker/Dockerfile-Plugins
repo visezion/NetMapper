@@ -1,12 +1,13 @@
 FROM netboxcommunity/netbox:v4.6
 
-COPY ./plugin_requirements.txt /
+COPY docker/plugin_requirements.txt /tmp/plugin_requirements.txt
+COPY . /opt/netbox/netdoc-source
 RUN apt-get update
 RUN apt-get -y install git
 RUN git clone --depth=1 https://github.com/networktocode/ntc-templates /opt/ntc-templates
-RUN /opt/netbox/venv/bin/pip install  --no-warn-script-location -r /plugin_requirements.txt
+RUN /opt/netbox/venv/bin/pip install --no-warn-script-location -r /tmp/plugin_requirements.txt
+RUN /opt/netbox/venv/bin/pip install --no-warn-script-location /opt/netbox/netdoc-source
 
 # These lines are only required if your plugin has its own static files.
-COPY configuration/configuration.py /etc/netbox/config/configuration.py
-COPY configuration/plugins.py /etc/netbox/config/plugins.py
+COPY docker/configuration/configuration.py /etc/netbox/config/configuration.py
 RUN SECRET_KEY="dummydummydummydummydummydummydummydummydummydummy" /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py collectstatic --no-input
