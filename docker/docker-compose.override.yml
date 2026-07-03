@@ -13,14 +13,14 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile-Plugins
-    image: netbox:latest-plugins
+    image: netbox:${NETDOC_IMAGE_TAG:-latest-plugins}
   netbox-worker:
-    image: netbox:latest-plugins
+    image: netbox:${NETDOC_IMAGE_TAG:-latest-plugins}
     build:
       context: ..
       dockerfile: docker/Dockerfile-Plugins
   netbox-housekeeping:
-    image: netbox:latest-plugins
+    image: netbox:${NETDOC_IMAGE_TAG:-latest-plugins}
     build:
       context: ..
       dockerfile: docker/Dockerfile-Plugins

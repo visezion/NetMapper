@@ -32,11 +32,16 @@ fi
 git pull --ff-only
 
 UPDATED_COMMIT="$(git rev-parse HEAD)"
+SHORT_COMMIT="$(git rev-parse --short=12 HEAD)"
+export NETDOC_IMAGE_TAG="netdoc-${SHORT_COMMIT}"
 echo "Deploying commit: $UPDATED_COMMIT"
+echo "Docker image tag: netbox:${NETDOC_IMAGE_TAG}"
 
 cd "$DOCKER_DIR"
 
-docker compose build --no-cache netbox netbox-worker netbox-housekeeping
+docker compose down --remove-orphans || true
+docker image rm -f "netbox:${NETDOC_IMAGE_TAG}" || true
+docker compose build --pull --no-cache netbox netbox-worker netbox-housekeeping
 docker compose run --rm --no-deps netbox /opt/netbox/venv/bin/python -c "import pathlib, netdoc; print('Imported:', netdoc.__file__); source = pathlib.Path(netdoc.__file__).read_text(); assert 'getattr(extras_models, \"ReportModule\", None)' in source; print('NetDoc image verification passed')"
-docker compose up -d netbox netbox-worker netbox-housekeeping
+docker compose up -d --force-recreate netbox netbox-worker netbox-housekeeping
 docker compose logs --tail=100 netbox
