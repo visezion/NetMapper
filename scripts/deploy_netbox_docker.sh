@@ -44,4 +44,17 @@ docker image rm -f "netbox:${NETDOC_IMAGE_TAG}" || true
 docker compose build --pull --no-cache netbox netbox-worker netbox-housekeeping
 docker compose run --rm --no-deps netbox /opt/netbox/venv/bin/python -c "import pathlib, netdoc; print('Imported:', netdoc.__file__); source = pathlib.Path(netdoc.__file__).read_text(); assert 'getattr(extras_models, \"ReportModule\", None)' in source; print('NetDoc image verification passed')"
 docker compose up -d --force-recreate netbox netbox-worker netbox-housekeeping
+for _ in $(seq 1 60); do
+    NETBOX_STATE="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' netbox-docker-netbox-1 2>/dev/null || true)"
+    if [ "$NETBOX_STATE" = "healthy" ]; then
+        break
+    fi
+    sleep 2
+done
+if [ "${NETBOX_STATE:-}" != "healthy" ]; then
+    echo "NetBox container did not become healthy in time."
+    docker compose logs --tail=100 netbox
+    exit 1
+fi
+docker compose exec -T netbox /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py shell -c "from netdoc import sync_plugin_assets; sync_plugin_assets(); print('NetDoc asset sync passed')"
 docker compose logs --tail=100 netbox
