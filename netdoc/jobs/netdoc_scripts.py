@@ -354,7 +354,10 @@ class Ingest(Script):
                 self.log_info(f"Reingesting {msg}")
             else:
                 self.log_info(f"Ingesting {msg}")
-            log_ingest(log)
+            try:
+                log_ingest(log)
+            except ValueError as exc:
+                self.log_failure(str(exc))
 
         if len(log_list) > max_ingested_logs:
             # Need to span another job
