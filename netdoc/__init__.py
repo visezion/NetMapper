@@ -39,7 +39,7 @@ class NetdocConfig(PluginConfig):
     }
 
     def ready(self):
-        """Load signals and create reports/scripts."""
+        """Load signals and create scripts and optional legacy reports."""
         import sys  # noqa: F401 pylint: disable=import-outside-toplevel,unused-import
         from netdoc import (  # noqa: F401 pylint: disable=import-outside-toplevel,unused-import
             signals,
@@ -53,10 +53,11 @@ class NetdocConfig(PluginConfig):
                 DataSource,
                 DataFile,
             )
-            from extras.models import (  # noqa: F401 pylint: disable=import-outside-toplevel
-                ScriptModule,
-                ReportModule,
-            )
+            import extras.models as extras_models  # pylint: disable=import-outside-toplevel
+
+            ScriptModule = extras_models.ScriptModule
+            # NetBox v4.0 removed legacy reports. Keep report registration optional.
+            ReportModule = getattr(extras_models, "ReportModule", None)
 
             # Create/update data sources for NetDoc scripts on every restart
             jobs_path = os.path.join(MODULE_PATH, "jobs")
@@ -88,25 +89,26 @@ class NetdocConfig(PluginConfig):
                 script_o.sync()
                 script_o.save()
 
-            # Create/update NetDoc reports on every restart
-            report_name = "netdoc_reports"
-            report_filename = f"{report_name}.py"
-            report_file_o = DataFile.objects.get(path=report_filename)
-            try:
-                ReportModule.objects.get(file_path=report_filename)
-                # Overwrite reports
-                shutil.copy(f"{jobs_path}/{report_filename}", settings.REPORTS_ROOT)
-            except ReportModule.DoesNotExist:  # pylint: disable=no-member
-                report_o = ReportModule.objects.create(
-                    auto_sync_enabled=True,
-                    data_file=report_file_o,
-                    data_path=report_filename,
-                    data_source=jobs_ds_o,
-                    file_path=report_filename,
-                    file_root="reports",
-                )
-                report_o.sync()
-                report_o.save()
+            if ReportModule is not None:
+                # Create/update NetDoc reports only on NetBox releases that still support them.
+                report_name = "netdoc_reports"
+                report_filename = f"{report_name}.py"
+                report_file_o = DataFile.objects.get(path=report_filename)
+                try:
+                    ReportModule.objects.get(file_path=report_filename)
+                    # Overwrite reports
+                    shutil.copy(f"{jobs_path}/{report_filename}", settings.REPORTS_ROOT)
+                except ReportModule.DoesNotExist:  # pylint: disable=no-member
+                    report_o = ReportModule.objects.create(
+                        auto_sync_enabled=True,
+                        data_file=report_file_o,
+                        data_path=report_filename,
+                        data_source=jobs_ds_o,
+                        file_path=report_filename,
+                        file_root="reports",
+                    )
+                    report_o.sync()
+                    report_o.save()
 
         super().ready()
 
