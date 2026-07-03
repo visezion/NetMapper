@@ -111,9 +111,14 @@ window.addEventListener("load", () => {
     const topology_data = JSON.parse(document.getElementById("topology_data_json").textContent);
     const topology_details = JSON.parse(document.getElementById("topology_details_json").textContent);
     var physics = "physics" in topology_details ? topology_details["physics"] : true;
+    const hasTopology = topology_data["nodes"].length > 0;
 
     // Set giagram mode button
     setBtnToggleDiagram(physics);
+
+    if (!hasTopology) {
+        return;
+    }
 
     // For each node/edge, decode HTML title
     for (var i = 0; i < topology_data["nodes"].length; i++) {
@@ -135,6 +140,7 @@ window.addEventListener("load", () => {
 
     // On btnToggleDiagramMode click
     document.getElementById("btnToggleDiagramMode").addEventListener("click", (event) => {
+        event.preventDefault();
         var new_physics = !graph.physics.physicsEnabled;
         graph.setOptions({ physics: new_physics });
         // Update button
@@ -142,7 +148,8 @@ window.addEventListener("load", () => {
     });
 
     // On btnSaveDiagram click
-    document.getElementById("btnSaveDiagram").addEventListener("click", () => {
-	saveNodePositions();
+    document.getElementById("btnSaveDiagram").addEventListener("click", (event) => {
+        event.preventDefault();
+        saveNodePositions();
     });
 });

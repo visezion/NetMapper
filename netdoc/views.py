@@ -190,9 +190,29 @@ class DiagramView(generic.ObjectView):
             raise ModuleNotFoundError(
                 f"Get topology function not found for {instance.mode}"
             ) from exc
+        topology_data = module(interface_qs, instance.details)
+        topology_empty_message = None
+        if not topology_data.get("nodes"):
+            if instance.mode == "l2":
+                topology_empty_message = (
+                    "No cabled interfaces matched this diagram. "
+                    "L2 diagrams only include interfaces attached to cables."
+                )
+            elif instance.mode == "l3":
+                topology_empty_message = (
+                    "No interfaces with IP addresses matched this diagram."
+                )
+            elif instance.mode == "site":
+                topology_empty_message = (
+                    "No inter-site cabled interfaces matched this diagram."
+                )
+            else:
+                topology_empty_message = "No topology data matched this diagram."
+
         return {
-            "topology_data": module(interface_qs, instance.details),
+            "topology_data": topology_data,
             "topology_details": instance.details,
+            "topology_empty_message": topology_empty_message,
         }
 
 
