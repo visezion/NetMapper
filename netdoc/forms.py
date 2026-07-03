@@ -117,7 +117,7 @@ class CredentialBulkEditForm(NetBoxModelBulkEditForm):
 class DiagramForm(NetBoxModelForm):
     """Form used to add/edit Diagram."""
 
-    name = forms.CharField(required=False)
+    name = forms.CharField(required=True, strip=True)
     mode = forms.ChoiceField(choices=DiagramModeChoices, required=True)
     vrfs = DynamicModelMultipleChoiceField(
         queryset=VRF.objects.all(),
@@ -151,6 +151,13 @@ class DiagramForm(NetBoxModelForm):
             "include_global_vrf",
             "tags",
         ]
+
+    def clean_name(self):
+        """Reject blank names after trimming whitespace."""
+        name = self.cleaned_data["name"].strip()
+        if not name:
+            raise forms.ValidationError("Name is required.")
+        return name
 
 
 #
