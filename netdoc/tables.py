@@ -261,7 +261,7 @@ class MacAddressTableEntryTable(NetBoxTable):
     mac_address = tables.LinkColumn(
         "plugins:netdoc:macaddresstableentry", args=[tables.utils.A("pk")]
     )
-    device_role = tables.Column(accessor="interface.device.device_role")
+    device_role = tables.Column(accessor="interface.device.role")
     vvid = tables.Column(verbose_name="VLAN")
     actions = []  # Read only table
 
@@ -310,7 +310,7 @@ class RouteTableEntryTable(NetBoxTable):
     vrf = tables.LinkColumn(
         "ipam:vrf", args=[tables.utils.A("vrf__pk")], verbose_name="VRF"
     )
-    device_role = tables.Column(accessor="device.device_role")
+    device_role = tables.Column(accessor="device.role")
     actions = []  # Read only table
 
     class Meta(NetBoxTable.Meta):

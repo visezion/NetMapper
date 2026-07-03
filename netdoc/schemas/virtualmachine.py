@@ -22,6 +22,12 @@ def get_schema():
                 "type": "string",
                 "transform": ["toUpperCase"],
             },
+            "role_id": {
+                "type": "integer",
+                "enum": list(
+                    DeviceRole_model.objects.all().values_list("id", flat=True)
+                ),
+            },
             "device_role_id": {
                 "type": "integer",
                 "enum": list(
@@ -49,6 +55,13 @@ def get_schema():
     }
 
 
+def normalize_role_kwargs(kwargs):
+    """Accept both legacy device_role_id and current role_id keys."""
+    if "role_id" not in kwargs and "device_role_id" in kwargs:
+        kwargs["role_id"] = kwargs["device_role_id"]
+    return kwargs
+
+
 def get_schema_create():
     """Return the JSON schema to validate new VirtualMachine objects."""
     schema = get_schema()
@@ -67,8 +80,10 @@ def create(**kwargs):
     VirtualMachine is associated to a device, the device is associated
     to a cluster, and the cluster defines the platform.
     """
+    kwargs = normalize_role_kwargs(kwargs)
     kwargs = utils.delete_empty_keys(kwargs)
     validate(kwargs, get_schema_create(), format_checker=FormatChecker())
+    kwargs.pop("device_role_id", None)
     obj = utils.object_create(VirtualMachine, **kwargs)
     return obj
 
@@ -81,7 +96,9 @@ def get(name):
 
 def get_list(**kwargs):
     """Get a list of VirtualMachine objects."""
+    kwargs = normalize_role_kwargs(kwargs)
     validate(kwargs, get_schema(), format_checker=FormatChecker())
+    kwargs.pop("device_role_id", None)
     result = utils.object_list(VirtualMachine, **kwargs)
     return result
 
@@ -89,6 +106,7 @@ def get_list(**kwargs):
 def update(obj, status=None, **kwargs):
     """Update a VirtualMachine."""
     update_always = [
+        "role_id",
         "cluster_id",
         "site_id",
         "device_id",
@@ -106,8 +124,10 @@ def update(obj, status=None, **kwargs):
         )
         update_always.append("status")
 
+    kwargs = normalize_role_kwargs(kwargs)
     kwargs = utils.delete_empty_keys(kwargs)
     validate(kwargs, get_schema(), format_checker=FormatChecker())
+    kwargs.pop("device_role_id", None)
     kwargs_always = utils.filter_keys(kwargs, update_always)
     obj = utils.object_update(obj, **kwargs_always, force=True)
     return obj

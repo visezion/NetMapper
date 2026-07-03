@@ -16,7 +16,7 @@ from django.http import HttpResponse
 from utilities.forms import ConfirmationForm
 from utilities.htmx import is_htmx
 from utilities.permissions import get_permission_for_model
-from utilities.utils import get_viewname
+from utilities.views import get_viewname
 from netbox.views import generic
 
 from netdoc import models, tables, forms, filtersets, utils, topologies

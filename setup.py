@@ -13,7 +13,7 @@ __author__ = "Andrea Dainese"
 __contact__ = "andrea@adainese.it"
 __copyright__ = "Copyright 2022, Andrea Dainese"
 __license__ = "GPLv3"
-__version__ = "0.0.1-dev1"
+__version__ = "0.0.1-dev2"
 
 from setuptools import find_packages, setup
 

@@ -23,14 +23,13 @@ from textfsm.parser import TextFSMError
 
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.contrib.auth.models import User
 from django.db.models import Q
 
-from core.models import Job
 from dcim.models import MACAddress
-from extras.models import ScriptModule
-from extras.scripts import run_script
-from utilities.utils import NetBoxFakeRequest
+from extras.jobs import ScriptJob
+from extras.scripts import get_module_and_script
+from users.models import User
+from utilities.request import NetBoxFakeRequest
 from dcim.models import Interface
 from virtualization.models import VMInterface
 
@@ -151,7 +150,7 @@ def get_diagram_interfaces(
     if sites:
         interface_qs = interface_qs.filter(device__site_id__in=sites)
     if roles:
-        interface_qs = interface_qs.filter(device__device_role_id__in=roles)
+        interface_qs = interface_qs.filter(device__role_id__in=roles)
     virtual_interface_qs = VMInterface.objects.all()
     if sites:
         virtual_interface_qs = virtual_interface_qs.filter(
@@ -1066,27 +1065,26 @@ def spawn_script(script_name, get_data=None, post_data=None, file_list=None, use
     request = NetBoxFakeRequest(
         {
             "META": {},
+            "COOKIES": {},
             "POST": post_data,
             "GET": get_data,
             "FILES": file_list,
             "user": user,
+            "method": "POST",
+            "path": "",
             "id": uuid.uuid4(),
         }
     )
 
-    # Inspired by ScriptView defined in extras/views.py
-    module = ScriptModule.objects.get(file_path="netdoc_scripts.py")
-    script = module.scripts[script_name]()
-    job = Job.enqueue(
-        run_script,
-        instance=module,
-        name=script.class_name,
+    # Resolve the managed script object and execute it using NetBox's current script job API.
+    _, script = get_module_and_script("netdoc_scripts", script_name)
+    job = ScriptJob.enqueue(
+        instance=script,
         user=request.user,  # pylint: disable=no-member
-        schedule_at=None,
-        interval=None,
-        job_timeout=script.job_timeout,
-        data=request.POST,  # pylint: disable=no-member
+        immediate=True,
+        data=post_data,
         request=request,
+        commit=True,
     )
 
     return job.id

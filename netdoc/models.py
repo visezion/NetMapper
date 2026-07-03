@@ -114,9 +114,9 @@ class ArpTableEntry(NetBoxModel):
         """
         if (
             self.interface
-            and self.interface.device.device_role  # pylint: disable=no-member
+            and self.interface.device.role  # pylint: disable=no-member
         ):
-            return self.interface.device.device_role.name  # pylint: disable=no-member
+            return self.interface.device.role.name  # pylint: disable=no-member
         if (
             self.virtual_interface
             and self.virtual_interface.virtual_machine.role  # pylint: disable=no-member

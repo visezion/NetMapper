@@ -7,7 +7,7 @@ __license__ = "GPLv3"
 from django import template
 from django.urls import reverse
 
-from utilities.utils import get_viewname
+from utilities.views import get_viewname
 
 register = template.Library()
 

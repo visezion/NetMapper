@@ -28,6 +28,12 @@ def get_schema():
                 "type": "string",
                 "transform": ["toUpperCase"],
             },
+            "role_id": {
+                "type": "integer",
+                "enum": list(
+                    DeviceRole_model.objects.all().values_list("id", flat=True)
+                ),
+            },
             "device_role_id": {
                 "type": "integer",
                 "enum": list(
@@ -67,11 +73,18 @@ def get_schema_create():
     schema = get_schema()
     schema["required"] = [
         "name",
-        "device_role_id",
+        "role_id",
         "device_type_id",
         "site_id",
     ]
     return schema
+
+
+def normalize_role_kwargs(kwargs):
+    """Accept both legacy device_role_id and current role_id keys."""
+    if "role_id" not in kwargs and "device_role_id" in kwargs:
+        kwargs["role_id"] = kwargs["device_role_id"]
+    return kwargs
 
 
 def create(manufacturer=None, manufacturer_keyword=None, model_keyword=None, **kwargs):
@@ -98,13 +111,15 @@ def create(manufacturer=None, manufacturer_keyword=None, model_keyword=None, **k
 
     kwargs.update(
         {
-            "device_role_id": devicerole_o.id,
+            "role_id": devicerole_o.id,
             "device_type_id": model_o.id,
         }
     )
 
+    kwargs = normalize_role_kwargs(kwargs)
     kwargs = utils.delete_empty_keys(kwargs)
     validate(kwargs, get_schema_create(), format_checker=FormatChecker())
+    kwargs.pop("device_role_id", None)
     obj = utils.object_create(Device, **kwargs)
     return obj
 
@@ -117,14 +132,16 @@ def get(name):
 
 def get_list(**kwargs):
     """Get a list of Device objects."""
+    kwargs = normalize_role_kwargs(kwargs)
     validate(kwargs, get_schema(), format_checker=FormatChecker())
+    kwargs.pop("device_role_id", None)
     result = utils.object_list(Device, **kwargs)
     return result
 
 
 def update(obj, manufacturer=None, model_keyword=None, **kwargs):
     """Update a Device."""
-    update_always = ["cluster_id"]
+    update_always = ["cluster_id", "role_id"]
 
     if manufacturer and model_keyword and "Unknown" in obj.device_type.model:
         # Manufacturer and model are set, current model is uknown, adding to update_always
@@ -143,8 +160,10 @@ def update(obj, manufacturer=None, model_keyword=None, **kwargs):
         # Serial is not set, adding to update_always
         update_always.append("serial")
 
+    kwargs = normalize_role_kwargs(kwargs)
     kwargs = utils.delete_empty_keys(kwargs)
     validate(kwargs, get_schema(), format_checker=FormatChecker())
+    kwargs.pop("device_role_id", None)
     kwargs_always = utils.filter_keys(kwargs, update_always)
     obj = utils.object_update(obj, **kwargs_always, force=True)
     return obj

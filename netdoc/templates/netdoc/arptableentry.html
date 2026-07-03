@@ -30,8 +30,8 @@ __license__ = "GPLv3"
                         <tr>
                             <th scope="row">Device role</th>
                             <td>
-		                        {% if object.interface %}
-                                    <a href="{% url "dcim:devicerole" object.interface.device.device_role.pk %}">{{ object.interface.device.device_role.name }}</a>
+		                        {% if object.interface and object.interface.device.role %}
+                                    <a href="{% url "dcim:devicerole" object.interface.device.role.pk %}">{{ object.interface.device.role.name }}</a>
 				                {% elif object.virtual_interface and object.virtual_interface.virtual_machine.role %}
                                     <a href="{% url "dcim:devicerole" object.virtual_interface.virtual_machine.role.pk %}">{{ object.virtual_interface.virtual_machine.role.name }}</a>
 				                {% endif %}

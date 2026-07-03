@@ -14,7 +14,7 @@ from django.conf import settings
 from netdoc.dictionaries import DeviceImageChoices, DRAWIO_ROLE_MAP
 
 PLUGIN_SETTINGS = settings.PLUGINS_CONFIG.get("netdoc", {})
-ROLE_MAP = PLUGIN_SETTINGS.get("ROLE_MAP")
+ROLE_MAP = PLUGIN_SETTINGS.get("ROLE_MAP", {}) or {}
 
 JINJA_AUTOESCAPE = select_autoescape(
     enabled_extensions=["html"], default_for_string=True
@@ -123,6 +123,18 @@ def integer_hash(text, length=16):
     return int(hashlib.sha256(text.encode("utf-8")).hexdigest(), 16) % 10**length
 
 
+def get_role_details(device_o):
+    """Return normalized role slug/color details for a device or virtual machine."""
+    role_o = getattr(device_o, "role", None)
+    role_slug = role_o.slug if role_o else "unknown"
+    role_color = role_o.color if role_o else "000000"
+
+    if role_slug in ROLE_MAP:
+        role_slug = ROLE_MAP.get(role_slug)
+
+    return role_slug, role_color
+
+
 def get_l2_topology_data(interface_list, details):
     """Create a L2 vis.js topology data from an Interface list."""
     nodes = {}
@@ -133,11 +145,7 @@ def get_l2_topology_data(interface_list, details):
         device_o = interface_o.device
         device_id = device_o.pk
         if device_id not in nodes:
-            role_color = device_o.device_role.color
-            device_role = device_o.device_role.slug
-            if device_role in ROLE_MAP:
-                # Custom device role
-                device_role = ROLE_MAP.get(device_role)
+            device_role, role_color = get_role_details(device_o)
             if device_role in [key for key, value in DeviceImageChoices()]:
                 image_url = f"/static/netdoc/img/{device_role}.png"
             else:
@@ -249,27 +257,15 @@ def get_l3_topology_data(interface_list, details):
             if type(interface_o).__name__ == "VMInterface":
                 # Virtual device
                 device_o = interface_o.virtual_machine
-                device_name = device_o.name
-                if device_o.role:
-                    role_color = device_o.role.color
-                    device_role = device_o.role.slug
-                else:
-                    # Role is not set, use default
-                    role_color = "000000"
-                    device_role = "unknown"
             else:
                 # Physical device
                 device_o = interface_o.device
-                device_name = device_o.name
-                role_color = device_o.device_role.color
-                device_role = device_o.device_role.slug
+            device_name = device_o.name
+            device_role, role_color = get_role_details(device_o)
             vrf_name = interface_o.vrf.name if interface_o.vrf else None
             device_str = f"{device_name}:{vrf_name}" if vrf_name else device_name
             device_id = integer_hash(device_str)
             if device_id not in nodes:
-                if device_role in ROLE_MAP:
-                    # Custom device role
-                    device_role = ROLE_MAP.get(device_role)
                 if device_role in [key for key, value in DeviceImageChoices()]:
                     image_url = f"/static/netdoc/img/{device_role}.png"
                 else:
