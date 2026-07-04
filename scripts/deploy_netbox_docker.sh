@@ -83,7 +83,7 @@ wait_for_container_state netbox-docker-postgres-1 healthy 120
 wait_for_container_state netbox-docker-redis-1 healthy 60
 wait_for_container_state netbox-docker-redis-cache-1 healthy 60
 docker image rm -f "netbox:${NETDOC_IMAGE_TAG}" || true
-compose build --pull --no-cache netbox netbox-worker netbox-housekeeping
+compose build --pull --no-cache netbox netbox-worker
 compose run --rm --no-deps netbox /opt/netbox/venv/bin/python -c "import pathlib, netdoc; print('Imported:', netdoc.__file__); source = pathlib.Path(netdoc.__file__).read_text(); assert 'getattr(extras_models, \"ReportModule\", None)' in source; print('NetDoc image verification passed')"
 compose up -d --force-recreate netbox
 if ! wait_for_container_state netbox-docker-netbox-1 healthy 180; then
@@ -93,7 +93,5 @@ if ! wait_for_container_state netbox-docker-netbox-1 healthy 180; then
 fi
 compose up -d --force-recreate netbox-worker
 wait_for_container_state netbox-docker-netbox-worker-1 healthy 120
-compose up -d --force-recreate netbox-housekeeping
-wait_for_container_state netbox-docker-netbox-housekeeping-1 running 120
 compose exec -T netbox /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py shell -c "from netdoc import sync_plugin_assets; sync_plugin_assets(); print('NetDoc asset sync passed')"
 compose logs --tail=100 netbox

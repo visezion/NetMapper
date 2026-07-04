@@ -36,7 +36,7 @@ The script:
 * validates the built image can import the expected patched `netdoc`
 * rebuilds the NetBox plugin image with `--no-cache`
 * starts Postgres and Redis first on a fresh server, then starts the NetBox app containers
-* restarts `netbox`, `netbox-worker`, and `netbox-housekeeping`
+* restarts `netbox` and `netbox-worker`
 * prints the latest `netbox` container logs
 
 By default the script expects:

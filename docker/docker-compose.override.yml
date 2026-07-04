@@ -23,10 +23,3 @@ services:
       dockerfile: docker/Dockerfile-Plugins
     volumes:
       - ${NETDOC_PATH:-../netdoc}/docker/configuration/plugins.py:/etc/netbox/config/plugins.py:ro
-  netbox-housekeeping:
-    image: netbox:${NETDOC_IMAGE_TAG:-latest-plugins}
-    build:
-      context: ${NETDOC_PATH:-../netdoc}
-      dockerfile: docker/Dockerfile-Plugins
-    volumes:
-      - ${NETDOC_PATH:-../netdoc}/docker/configuration/plugins.py:/etc/netbox/config/plugins.py:ro
