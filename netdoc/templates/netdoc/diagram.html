@@ -38,10 +38,11 @@ __license__ = "GPLv3"
     </div>
 {% endblock content %}
 {% block javascript %}
+    {% now "U" as asset_version %}
     {{ topology_details|json_script:"topology_details_json" }}
     {{ topology_data|json_script:"topology_data_json" }}
     <script type="text/javascript"
-            src="{% static "netdoc/js/vis-network.min.js" %}"></script>
-    <script type="text/javascript" src="{% static "netdoc/js/netdoc.js" %}"></script>
-    <script type="text/javascript" src="{% static "netdoc/js/diagram.js" %}"></script>
+            src="{% static "netdoc/js/vis-network.min.js" %}?v={{ asset_version }}"></script>
+    <script type="text/javascript" src="{% static "netdoc/js/netdoc.js" %}?v={{ asset_version }}"></script>
+    <script type="text/javascript" src="{% static "netdoc/js/diagram.js" %}?v={{ asset_version }}"></script>
 {% endblock javascript %}
