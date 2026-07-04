@@ -45,8 +45,16 @@ def discovery(addresses=None, script_handler=None, filters=None, filter_type=Non
             tempfile.gettempdir(), f"nornir-{utils.get_random_string(6)}.log"
         )
     else:
-        log_filename = PLUGIN_SETTINGS.get("NORNIR_LOG")
-    file_h = logging.FileHandler(log_filename)
+        log_filename = PLUGIN_SETTINGS.get("NORNIR_LOG") or os.path.join(
+            tempfile.gettempdir(), "nornir.log"
+        )
+    try:
+        file_h = logging.FileHandler(log_filename)
+    except PermissionError:
+        log_filename = os.path.join(
+            tempfile.gettempdir(), f"nornir-{utils.get_random_string(6)}.log"
+        )
+        file_h = logging.FileHandler(log_filename)
     file_h.setLevel(logging.DEBUG)
     logger.addHandler(file_h)
 
