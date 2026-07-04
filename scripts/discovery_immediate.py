@@ -3,8 +3,8 @@
 Usage:
 /opt/netbox/venv/bin/python3 /opt/netbox/netbox/manage.py shell < discovery_immediate.py
 """
-from netdoc.models import Discoverable
-from netdoc.tasks import discovery
+from netmapper.models import Discoverable
+from netmapper.tasks import discovery
 
 FILTERS = ["172.25.82.45"]  # List of discoverable IP addresses
 FILTERS = []

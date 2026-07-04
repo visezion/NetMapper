@@ -3,7 +3,7 @@
 Usage:
 /opt/netbox/venv/bin/python3 /opt/netbox/netbox/manage.py shell < log_parse.py
 """
-from netdoc.models import DiscoveryLog
+from netmapper.models import DiscoveryLog
 
 FILTERS = ["172.25.82.44", "172.25.82.45"]  # List of discoverable IP addresses
 FILTERS = []

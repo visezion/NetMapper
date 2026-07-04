@@ -1,0 +1,87 @@
+"""Schema validation for ArpTableEntry."""
+__author__ = "Andrea Dainese"
+__contact__ = "andrea@adainese.it"
+__copyright__ = "Copyright 2022, Andrea Dainese"
+__license__ = "GPLv3"
+
+import ipaddress
+from jsonschema import validate, FormatChecker
+
+from ipam.models import Prefix, VRF
+
+from netmapper import utils
+
+
+def get_prefix_field_names():
+    """Return the concrete Prefix model field names."""
+    field_names = set()
+    for field in Prefix._meta.concrete_fields:
+        field_names.add(field.name)
+        field_names.add(getattr(field, "attname", field.name))
+    return field_names
+
+
+def get_schema():
+    """Return the JSON schema to validate Prefix data."""
+    return {
+        "type": "object",
+        "properties": {
+        "prefix": {
+            "type": "string",
+        },
+        "vrf_id": {
+            "type": "integer",
+            "enum": list(VRF.objects.all().values_list("id", flat=True)),
+        },
+        },
+    }
+
+
+def get_schema_create():
+    """Return the JSON schema to validate new Prefix objects."""
+    schema = get_schema()
+    schema["required"] = [
+        "prefix",
+    ]
+    return schema
+
+
+def address_to_network(address):
+    """Convert an IP address with mask into the network address with mask."""
+    try:
+        # It's a network
+        return str(ipaddress.ip_network(address))
+    except ValueError:
+        # It's a host
+        try:
+            return str(ipaddress.ip_interface(address).network)
+        except ValueError as exc:
+            raise ValueError(f"Invalid IP address {address}") from exc
+
+
+def create(prefix=None, **kwargs):
+    """Create an Prefix."""
+    prefix = address_to_network(prefix)
+    allowed_fields = get_prefix_field_names()
+    data = {
+        "prefix": prefix,
+        **{
+            key: value
+            for key, value in kwargs.items()
+            if key in allowed_fields and key != "site_id"
+        },
+    }
+    if prefix.endswith("/32"):
+        # Don't create /32 prefixes
+        return None
+    data = utils.delete_empty_keys(data)
+    validate(data, get_schema_create(), format_checker=FormatChecker())
+    obj = utils.object_create(Prefix, **data)
+    return obj
+
+
+def get(prefix, vrf_id=None):
+    """Return an Prefix."""
+    prefix = address_to_network(prefix)
+    obj = utils.object_get_or_none(Prefix, prefix=prefix, vrf__id=vrf_id)
+    return obj

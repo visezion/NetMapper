@@ -4,7 +4,7 @@ Usage:
 /opt/netbox/venv/bin/python3 /opt/netbox/netbox/manage.py shell < automate_sites.py
 """
 from dcim.models import Device, Site, DeviceRole
-from netdoc.models import Diagram
+from netmapper.models import Diagram
 
 
 def update_role(device_o, role_slug):

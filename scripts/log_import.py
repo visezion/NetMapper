@@ -7,8 +7,8 @@ from os import walk
 import sys
 import json
 
-from netdoc.models import Discoverable
-from netdoc.schemas import discoverylog
+from netmapper.models import Discoverable
+from netmapper.schemas import discoverylog
 
 files = []
 

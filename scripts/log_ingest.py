@@ -3,8 +3,8 @@
 Usage:
 /opt/netbox/venv/bin/python3 /opt/netbox/netbox/manage.py shell < log_ingest.py
 """
-from netdoc.models import DiscoveryLog
-from netdoc.utils import log_ingest
+from netmapper.models import DiscoveryLog
+from netmapper.utils import log_ingest
 
 FILTERS = ["172.25.82.50"]  # List of discoverable IP addresses
 FILTERS = []

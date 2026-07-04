@@ -5,7 +5,7 @@ Usage:
 """
 from django.db.models import Count
 
-from netdoc.models import DiscoveryLog
+from netmapper.models import DiscoveryLog
 
 # Delete failed logs
 # DiscoveryLog.objects.filter(success=False, configuration=False).delete()

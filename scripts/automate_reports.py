@@ -10,7 +10,7 @@ from django.db.models import Count
 from dcim.models import Device, Site, Interface
 from ipam.models import VRF
 
-from netdoc.models import Discoverable, RouteTableEntry
+from netmapper.models import Discoverable, RouteTableEntry
 
 role_ids = [4, 23, 24, 22, 19, 20, 21]
 bb_role_ids = [23, 24, 19, 20, 21]

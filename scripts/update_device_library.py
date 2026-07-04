@@ -6,7 +6,7 @@ import yaml
 from yaml.loader import SafeLoader
 
 SRC_DIR = "../devicetype-library/device-types"
-DST_DIR = "netdoc/library/"
+DST_DIR = "netmapper/library/"
 
 if not path.isdir(SRC_DIR):
     print("Clone git repository with the following command:")

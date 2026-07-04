@@ -5,7 +5,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 NETBOX_DOCKER_DIR="${NETBOX_DOCKER_DIR:-${DOCKER_DIR:-$REPO_ROOT/../netbox-docker}}"
 OVERRIDE_FILE="${OVERRIDE_FILE:-$REPO_ROOT/docker/docker-compose.override.yml}"
-export NETDOC_PATH="${NETDOC_PATH:-$REPO_ROOT}"
+export NETMAPPER_PATH="${NETMAPPER_PATH:-${NETDOC_PATH:-$REPO_ROOT}}"
 BRANCH="${1:-}"
 ALLOW_DIRTY="${ALLOW_DIRTY:-0}"
 NETBOX_STARTUP_TIMEOUT="${NETBOX_STARTUP_TIMEOUT:-600}"
@@ -22,7 +22,7 @@ echo "Branch: $TARGET_BRANCH"
 echo "Current commit: $CURRENT_COMMIT"
 echo "NetBox Docker directory: $NETBOX_DOCKER_DIR"
 echo "Compose override: $OVERRIDE_FILE"
-echo "NETDOC_PATH: $NETDOC_PATH"
+echo "NETMAPPER_PATH: $NETMAPPER_PATH"
 echo "NetBox startup timeout: ${NETBOX_STARTUP_TIMEOUT}s"
 echo "NetBox worker startup timeout: ${NETBOX_WORKER_STARTUP_TIMEOUT}s"
 
@@ -32,7 +32,7 @@ if [ ! -f "$NETBOX_DOCKER_DIR/docker-compose.yml" ]; then
 fi
 
 if [ ! -f "$OVERRIDE_FILE" ]; then
-    echo "Could not find NetDoc compose override at: $OVERRIDE_FILE"
+    echo "Could not find NetMapper compose override at: $OVERRIDE_FILE"
     exit 1
 fi
 
@@ -78,17 +78,17 @@ git pull --ff-only
 
 UPDATED_COMMIT="$(git rev-parse HEAD)"
 SHORT_COMMIT="$(git rev-parse --short=12 HEAD)"
-export NETDOC_IMAGE_TAG="netdoc-${SHORT_COMMIT}"
+export NETMAPPER_IMAGE_TAG="${NETMAPPER_IMAGE_TAG:-netmapper-${SHORT_COMMIT}}"
 echo "Deploying commit: $UPDATED_COMMIT"
-echo "Docker image tag: netbox:${NETDOC_IMAGE_TAG}"
+echo "Docker image tag: netbox:${NETMAPPER_IMAGE_TAG}"
 
 compose up -d postgres redis redis-cache
 wait_for_container_state netbox-docker-postgres-1 healthy 120
 wait_for_container_state netbox-docker-redis-1 healthy 60
 wait_for_container_state netbox-docker-redis-cache-1 healthy 60
-docker image rm -f "netbox:${NETDOC_IMAGE_TAG}" || true
+docker image rm -f "netbox:${NETMAPPER_IMAGE_TAG}" || true
 compose build --pull --no-cache netbox netbox-worker
-compose run --rm --no-deps netbox /opt/netbox/venv/bin/python -c "import pathlib, netdoc; print('Imported:', netdoc.__file__); source = pathlib.Path(netdoc.__file__).read_text(); assert 'getattr(extras_models, \"ReportModule\", None)' in source; print('NetDoc image verification passed')"
+compose run --rm --no-deps netbox /opt/netbox/venv/bin/python -c "import pathlib, netmapper; print('Imported:', netmapper.__file__); source = pathlib.Path(netmapper.__file__).read_text(); assert 'getattr(extras_models, \"ReportModule\", None)' in source; print('NetMapper image verification passed')"
 compose up -d --remove-orphans --force-recreate netbox
 if ! wait_for_container_state netbox-docker-netbox-1 healthy "$NETBOX_STARTUP_TIMEOUT"; then
     echo "NetBox container did not become healthy in time."
@@ -97,5 +97,5 @@ if ! wait_for_container_state netbox-docker-netbox-1 healthy "$NETBOX_STARTUP_TI
 fi
 compose up -d --remove-orphans --force-recreate netbox-worker
 wait_for_container_state netbox-docker-netbox-worker-1 healthy "$NETBOX_WORKER_STARTUP_TIMEOUT"
-compose exec -T netbox /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py shell -c "from netdoc import sync_plugin_assets; sync_plugin_assets(); print('NetDoc asset sync passed')"
+compose exec -T netbox /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py shell -c "from netmapper import sync_plugin_assets; sync_plugin_assets(); print('NetMapper asset sync passed')"
 compose logs --tail=100 netbox

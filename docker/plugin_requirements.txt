@@ -1,2 +1,2 @@
 # Third-party requirements for the image.
-# The local NetDoc checkout is installed explicitly in Dockerfile-Plugins.
+# The local NetMapper checkout is installed explicitly in Dockerfile-Plugins.

@@ -1,23 +1,26 @@
 FROM netboxcommunity/netbox:v4.6
 
 COPY docker/plugin_requirements.txt /tmp/plugin_requirements.txt
-COPY . /opt/netbox/netdoc-source
+COPY . /opt/netbox/netmapper-source
 RUN apt-get update
 RUN apt-get -y install git
 RUN git clone --depth=1 https://github.com/networktocode/ntc-templates /opt/ntc-templates
 RUN if grep -Eq '^[[:space:]]*[^#[:space:]]' /tmp/plugin_requirements.txt; then \
         uv pip install --python /opt/netbox/venv/bin/python --system -r /tmp/plugin_requirements.txt; \
     fi
-RUN uv pip uninstall --python /opt/netbox/venv/bin/python --system netdoc || true
+RUN uv pip uninstall --python /opt/netbox/venv/bin/python --system netdoc netmapper || true
 RUN find /opt/netbox/venv/lib -path "*/site-packages/netdoc*" -exec rm -rf {} +
+RUN find /opt/netbox/venv/lib -path "*/site-packages/netmapper*" -exec rm -rf {} +
 RUN find /opt/netbox/venv/lib -path "*/site-packages/__editable__.*netdoc*" -delete
+RUN find /opt/netbox/venv/lib -path "*/site-packages/__editable__.*netmapper*" -delete
 RUN find /opt/netbox/venv/lib -path "*/site-packages/netdoc.egg-link" -delete
-RUN uv pip install --python /opt/netbox/venv/bin/python --system /opt/netbox/netdoc-source
+RUN find /opt/netbox/venv/lib -path "*/site-packages/netmapper.egg-link" -delete
+RUN uv pip install --python /opt/netbox/venv/bin/python --system /opt/netbox/netmapper-source
 RUN uv pip install --python /opt/netbox/venv/bin/python --system setuptools==80.9.0
 RUN SITE_PACKAGES=$(/opt/netbox/venv/bin/python -c "import site; print(site.getsitepackages()[0])") && \
-    rm -rf "$SITE_PACKAGES/netdoc" && \
-    cp -r /opt/netbox/netdoc-source/netdoc "$SITE_PACKAGES/netdoc"
-RUN /opt/netbox/venv/bin/python -c "import pathlib, site; path = pathlib.Path(site.getsitepackages()[0]) / 'netdoc' / '__init__.py'; print(path); source = path.read_text(); assert 'getattr(extras_models, \"ReportModule\", None)' in source, path"
+    rm -rf "$SITE_PACKAGES/netmapper" && \
+    cp -r /opt/netbox/netmapper-source/netmapper "$SITE_PACKAGES/netmapper"
+RUN /opt/netbox/venv/bin/python -c "import pathlib, site; path = pathlib.Path(site.getsitepackages()[0]) / 'netmapper' / '__init__.py'; print(path); source = path.read_text(); assert 'getattr(extras_models, \"ReportModule\", None)' in source, path"
 
 # These lines are only required if your plugin has its own static files.
 COPY docker/configuration/plugins.py /etc/netbox/config/plugins.py

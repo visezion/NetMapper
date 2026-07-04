@@ -6,8 +6,8 @@ Usage:
 from os import makedirs
 import json
 
-from netdoc.models import DiscoveryLog
-from netdoc.utils import export_log
+from netmapper.models import DiscoveryLog
+from netmapper.utils import export_log
 
 LAB = "lab1"
 
@@ -18,7 +18,7 @@ for discoverylog_o in discoverylog_qs:
     data = export_log(discoverylog_o)
     address = discoverylog_o.discoverable.address
     mode = discoverylog_o.discoverable.mode
-    lab_path = f"netdoc/tests/{mode}/{LAB}"
+    lab_path = f"netmapper/tests/{mode}/{LAB}"
     log_name = discoverylog_o.command.replace(" ", "_").replace("_|_", "_")
     raw_output = data.get("raw_output")
 

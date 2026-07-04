@@ -6,7 +6,7 @@ Usage:
 import pprint
 from netmiko.utilities import get_structured_data
 
-from netdoc.models import DiscoveryLog
+from netmapper.models import DiscoveryLog
 
 LOG_ID = 4139  # DiscoveryLog ID
 

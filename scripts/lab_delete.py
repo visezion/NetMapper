@@ -14,7 +14,7 @@ from dcim.models import (
     CablePath,
 )
 from ipam.models import IPAddress, Prefix, VRF, VLAN
-from netdoc.models import (
+from netmapper.models import (
     ArpTableEntry,
     MacAddressTableEntry,
     RouteTableEntry,

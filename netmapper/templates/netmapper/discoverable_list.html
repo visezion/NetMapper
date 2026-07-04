@@ -1,0 +1,27 @@
+{% extends "generic/object_list.html" %}
+{% load buttons %}
+{% comment %}
+__author__ = "Andrea Dainese"
+__contact__ = "andrea@adainese.it"
+__copyright__ = "Copyright 2022, Andrea Dainese"
+__license__ = "GPLv3"
+{% endcomment %}
+{% comment %}
+Add "Discover Selected" button to the generic template.
+{% endcomment %}
+{% block bulk_buttons %}
+    {% if "bulk_discover" in action_names %}
+        <button type="submit"
+                name="_discover"
+                formaction="{% url "plugins:netmapper:discoverable_bulk_discover" %}?return_url={% url "plugins:netmapper:discoverable_list" %}"
+                class="btn btn-secondary">
+            <i class="mdi mdi-refresh" aria-hidden="true"></i> Discover Selected
+        </button>
+    {% endif %}
+    {% if "bulk_edit" in action_names %}
+        {% bulk_edit_button model query_params=request.GET %}
+    {% endif %}
+    {% if "bulk_delete" in action_names %}
+        {% bulk_delete_button model query_params=request.GET %}
+    {% endif %}
+{% endblock bulk_buttons %}

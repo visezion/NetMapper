@@ -13,9 +13,9 @@ from nornir import InitNornir
 from nornir.core.filter import F
 from nornir_netmiko.tasks import netmiko_send_command
 
-from netdoc.nornir_inventory import AssetInventory
-from netdoc import utils
-from netdoc.models import Discoverable
+from netmapper.nornir_inventory import AssetInventory
+from netmapper import utils
+from netmapper.models import Discoverable
 
 COMMANDS = [
     "show bgp ipv4 unicast",

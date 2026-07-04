@@ -11,15 +11,15 @@ services:
     ports:
       - 8000:8080
     build:
-      context: ${NETDOC_PATH:-../netdoc}
+      context: ${NETMAPPER_PATH:-../NetMapper}
       dockerfile: docker/Dockerfile-Plugins
     volumes:
-      - ${NETDOC_PATH:-../netdoc}/docker/configuration/plugins.py:/etc/netbox/config/plugins.py:ro
-    image: netbox:${NETDOC_IMAGE_TAG:-latest-plugins}
+      - ${NETMAPPER_PATH:-../NetMapper}/docker/configuration/plugins.py:/etc/netbox/config/plugins.py:ro
+    image: netbox:${NETMAPPER_IMAGE_TAG:-latest-plugins}
   netbox-worker:
-    image: netbox:${NETDOC_IMAGE_TAG:-latest-plugins}
+    image: netbox:${NETMAPPER_IMAGE_TAG:-latest-plugins}
     build:
-      context: ${NETDOC_PATH:-../netdoc}
+      context: ${NETMAPPER_PATH:-../NetMapper}
       dockerfile: docker/Dockerfile-Plugins
     volumes:
-      - ${NETDOC_PATH:-../netdoc}/docker/configuration/plugins.py:/etc/netbox/config/plugins.py:ro
+      - ${NETMAPPER_PATH:-../NetMapper}/docker/configuration/plugins.py:/etc/netbox/config/plugins.py:ro

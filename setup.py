@@ -1,5 +1,5 @@
 """
-NetDoc PYPI setup file.
+NetMapper PYPI setup file.
 
 Install with: python3 setup.py install
 Develop with: python3 setup.py develop
@@ -10,20 +10,20 @@ Make it available on PIP with:
 """
 
 __author__ = "Andrea Dainese"
-__contact__ = "andrea@adainese.it"
+__contact__ = "oluwasusiv@gmail.com"
 __copyright__ = "Copyright 2022, Andrea Dainese"
 __license__ = "GPLv3"
-__version__ = "0.0.1-dev3"
+__version__ = "0.1.0"
 
 from setuptools import find_packages, setup
 
 setup(
-    name="netdoc",
+    name="netmapper",
     version=__version__,
-    description="Automatic Network Documentation plugin for NetBox",
-    url="https://github.com/dainok/netdoc",
-    author="Andrea Dainese",
-    author_email="andrea@adainese.it",
+    description="Network discovery, topology mapping, and operational documentation for NetBox",
+    url="https://github.com/visezion/NetMapper",
+    author="Victor Ayodeji Oluwasusi",
+    author_email="oluwasusiv@gmail.com",
     license="GNU v3.0",
     install_requires=[
         "ipaddress==1.0.23",
@@ -49,6 +49,6 @@ setup(
         "Programming Language :: Python :: 3 :: Only",
     ],
     project_urls={
-        "Source": "https://github.com/dainok/netdoc",
+        "Source": "https://github.com/visezion/NetMapper",
     },
 )

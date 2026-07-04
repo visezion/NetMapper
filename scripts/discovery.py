@@ -5,8 +5,8 @@ Usage:
 """
 from users.models import User
 
-from netdoc.models import Discoverable
-from netdoc.utils import spawn_script
+from netmapper.models import Discoverable
+from netmapper.utils import spawn_script
 
 FILTERS = ["172.25.82.45"]  # List of discoverable IP addresses
 FILTERS = []

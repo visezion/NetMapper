@@ -1,9 +1,9 @@
 PLUGINS = [
-    "netdoc",
+    "netmapper",
 ]
 
 PLUGINS_CONFIG = {
-    "netdoc": {
+    "netmapper": {
         "NTC_TEMPLATES_DIR": "/opt/ntc-templates/ntc_templates/templates",
     }
 }

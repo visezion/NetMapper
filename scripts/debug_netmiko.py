@@ -2,7 +2,7 @@
 import logging
 from netmiko import ConnectHandler
 
-from netdoc import models
+from netmapper import models
 
 ADDRESS = "172.25.82.34"
 COMMANDS = [

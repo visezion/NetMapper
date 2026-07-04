@@ -7,7 +7,7 @@ from nornir.core.plugins.inventory import InventoryPluginRegister
 from nornir_netmiko.tasks import netmiko_send_command
 from nornir_utils.plugins.functions import print_result
 
-from netdoc.nornir_inventory import AssetInventory
+from netmapper.nornir_inventory import AssetInventory
 
 ADDRESS = "172.25.82.34"
 ENABLE = True
