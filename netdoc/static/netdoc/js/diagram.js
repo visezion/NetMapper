@@ -90,10 +90,10 @@ function saveNodePositions() {
     });
     xhr.onload = () => {
         // Request finished
-        if (xhr.status==200) {
+        if (xhr.status >= 200 && xhr.status < 300) {
             addMessage("success", "Diagram has been saved");
         } else {
-            addMessage("danger", "Failed to save diagram");
+            addMessage("danger", "Failed to save diagram (HTTP " + xhr.status + ")");
         }
     };
     xhr.send(data);

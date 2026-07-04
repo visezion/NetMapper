@@ -21,6 +21,7 @@ from netdoc import utils
 from netdoc.dictionaries import DiscoveryModeChoices
 
 PLUGIN_SETTINGS = settings.PLUGINS_CONFIG.get("netdoc", {})
+NORNIR_NUM_WORKERS = PLUGIN_SETTINGS.get("NORNIR_NUM_WORKERS", 10)
 
 
 def discovery(addresses=None, script_handler=None, filters=None, filter_type=None):
@@ -57,7 +58,7 @@ def discovery(addresses=None, script_handler=None, filters=None, filter_type=Non
         runner={
             "plugin": "threaded",
             "options": {
-                "num_workers": 10,
+                "num_workers": NORNIR_NUM_WORKERS,
             },
         },
         inventory={"plugin": "asset-inventory"},

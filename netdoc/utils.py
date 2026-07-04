@@ -39,6 +39,15 @@ from netdoc.dictionaries import DiscoveryModeChoices
 PLUGIN_SETTINGS = settings.PLUGINS_CONFIG.get("netdoc", {})
 
 
+def task_has_netmiko_secret(task):
+    """Return True when the current host has an enable secret configured."""
+    connection_options = task.host.connection_options.get("netmiko")
+    if not connection_options:
+        return False
+    extras = connection_options.extras or {}
+    return bool(extras.get("secret"))
+
+
 def append_nornir_netmiko_tasks(
     task, commands, enable=True, filters=None, filter_type=None, order=None
 ):
@@ -68,10 +77,11 @@ def append_nornir_netmiko_tasks(
                 continue
 
         # Append the command to Nornir tasks
+        command_enable = enable and task_has_netmiko_secret(task)
         details = {
             "command": cmd_line,
             "template": template,
-            "enable": enable,
+            "enable": command_enable,
             "order": order,
         }
         task.run(
@@ -79,7 +89,7 @@ def append_nornir_netmiko_tasks(
             name=json.dumps(details),
             command_string=details.get("command"),
             use_textfsm=False,
-            enable=details.get("enable"),
+            enable=command_enable,
             use_timing=False,
             read_timeout=PLUGIN_SETTINGS.get("NORNIR_TIMEOUT"),
         )

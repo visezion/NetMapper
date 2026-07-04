@@ -48,6 +48,54 @@ from netdoc.dictionaries import (
 PLUGIN_SETTINGS = settings.PLUGINS_CONFIG.get("netdoc", {})
 NORNIR_LOG = PLUGIN_SETTINGS.get("NORNIR_LOG")
 MAX_INGESTED_LOGS = PLUGIN_SETTINGS.get("MAX_INGESTED_LOGS")
+DISCOVERY_BATCH_SIZE = max(1, PLUGIN_SETTINGS.get("DISCOVERY_BATCH_SIZE", 10))
+
+
+def _normalize_filters(raw_filters):
+    """Return a clean filter list from a comma-separated string."""
+    if not raw_filters:
+        return []
+    return [item.strip() for item in raw_filters.split(",") if item.strip()]
+
+
+def _spawn_discovery_batch(
+    script_handler,
+    discoverables,
+    filters=None,
+    filter_type="exclude",
+):
+    """Run discovery on a batch and queue a follow-up job if needed."""
+    if not discoverables:
+        script_handler.log_failure("No discoverables selected")
+        return ""
+
+    filters = filters or []
+    current_batch = discoverables[:DISCOVERY_BATCH_SIZE]
+    remaining_batch = discoverables[DISCOVERY_BATCH_SIZE:]
+    current_addresses = [str(discoverable_o.address) for discoverable_o in current_batch]
+
+    if remaining_batch:
+        script_handler.log_info(
+            f"Processing {len(current_batch)} discoverables now and queuing "
+            f"{len(remaining_batch)} more in a follow-up job"
+        )
+        spawn_script(
+            "Discover",
+            post_data={
+                "discoverables": remaining_batch,
+                "undiscovered_only": False,
+                "filters": ",".join(filters),
+                "filter_type": filter_type,
+            },
+            user=script_handler.request.user,
+        )
+
+    return discovery(
+        current_addresses,
+        script_handler=script_handler,
+        filters=filters,
+        filter_type=filter_type,
+    )
 
 
 class CreateDeviceRole(Script):
@@ -127,6 +175,7 @@ class AddDiscoverable(Script):
     def run(self, data, commit):
         """Start the script."""
         discoverable_ip_addresses = []
+        discoverable_objects = []
 
         if not commit:
             self.log_warning("Commit not set, using dry-run mode")
@@ -136,9 +185,7 @@ class AddDiscoverable(Script):
         site_o = data.get("site")
         ip_addresses = re.split(" |,|\n", data.get("ip_addresses"))
 
-        filters = []
-        if data.get("filters"):
-            filters = data.get("filters").split(",")
+        filters = _normalize_filters(data.get("filters"))
         filter_type = data.get("filter_type")
 
         # Parse IP addresses
@@ -173,15 +220,16 @@ class AddDiscoverable(Script):
                 )
 
             discoverable_ip_addresses.append(discoverable_o.address)
+            discoverable_objects.append(discoverable_o)
 
         if not discoverable_ip_addresses:
             self.log_failure("No valid IP address to discover")
             return ""
 
         self.log_info(f"Starting discovery on {', '.join(discoverable_ip_addresses)}")
-        output = discovery(
-            discoverable_ip_addresses,
-            script_handler=self,
+        output = _spawn_discovery_batch(
+            self,
+            discoverable_objects,
             filters=filters,
             filter_type=filter_type,
         )
@@ -233,37 +281,42 @@ class Discover(Script):
     def run(self, data, commit):
         """Start the script."""
         # Filtering out discoverable=False is done at Nornir inventory level.
-        discoverable_ip_addresses = []
         discoverables = data.get("discoverables")
-
-        filters = []
-        if data.get("filters"):
-            filters = data.get("filters").split(",")
+        filters = _normalize_filters(data.get("filters"))
         filter_type = data.get("filter_type")
 
-        discoverable_ip_addresses = []
         if data.get("undiscovered_only"):
             # Get only undiscovered IP addresses
-            discoverables = discoverable.get_list(last_discovered_at__isnull=True)
-            for discoverable_o in discoverables:
-                discoverable_ip_addresses.append(discoverable_o.address)
-
+            discoverables = discoverable.get_list(
+                last_discovered_at__isnull=True, discoverable=True
+            )
+            discoverable_ip_addresses = [
+                str(discoverable_o.address) for discoverable_o in discoverables
+            ]
             self.log_info(
                 f"Starting first discovery on {', '.join(discoverable_ip_addresses)}"
             )
         elif discoverables:
-            for discoverable_o in discoverables:
-                discoverable_ip_addresses.append(discoverable_o.address)
-
+            discoverable_ip_addresses = [
+                str(discoverable_o.address) for discoverable_o in discoverables
+            ]
             self.log_info(
                 f"Starting discovery on {', '.join(discoverable_ip_addresses)}"
             )
         else:
+            discoverables = discoverable.get_list(discoverable=True)
+            discoverable_ip_addresses = [
+                str(discoverable_o.address) for discoverable_o in discoverables
+            ]
             self.log_info("Starting discovery on all IP addresses")
 
-        output = discovery(
-            discoverable_ip_addresses,
-            script_handler=self,
+        if not discoverables:
+            self.log_failure("No discoverables selected")
+            return ""
+
+        output = _spawn_discovery_batch(
+            self,
+            list(discoverables),
             filters=filters,
             filter_type=filter_type,
         )
