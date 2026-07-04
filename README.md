@@ -12,7 +12,14 @@ Compatibility:
 
 ## Server deploy flow
 
-When deploying with `netbox-docker`, make sure the server updates the NetDoc repository before starting the image build. A simple server-side flow is:
+When deploying with `netbox-docker`, clone the repositories side by side so the default paths line up without editing compose files:
+
+```bash
+git clone https://github.com/netbox-community/netbox-docker.git
+git clone https://github.com/visezion/netdoc.git
+```
+
+Then make sure the server updates the NetDoc repository before starting the image build. A simple server-side flow is:
 
 ```bash
 cd /path/to/netdoc
@@ -29,6 +36,17 @@ The script:
 * rebuilds the NetBox plugin image with `--no-cache`
 * restarts `netbox`, `netbox-worker`, and `netbox-housekeeping`
 * prints the latest `netbox` container logs
+
+By default the script expects:
+
+* `../netbox-docker` relative to the NetDoc checkout
+* `NETDOC_PATH` to be the NetDoc repository root
+
+If your directories differ, override them explicitly:
+
+```bash
+NETBOX_DOCKER_DIR=/path/to/netbox-docker NETDOC_PATH=/path/to/netdoc ./scripts/deploy_netbox_docker.sh
+```
 
 If you want to deploy a specific branch, pass it as the first argument:
 

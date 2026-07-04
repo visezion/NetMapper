@@ -11,16 +11,16 @@ services:
     ports:
       - 8000:8080
     build:
-      context: ..
+      context: ${NETDOC_PATH:-../netdoc}
       dockerfile: docker/Dockerfile-Plugins
     image: netbox:${NETDOC_IMAGE_TAG:-latest-plugins}
   netbox-worker:
     image: netbox:${NETDOC_IMAGE_TAG:-latest-plugins}
     build:
-      context: ..
+      context: ${NETDOC_PATH:-../netdoc}
       dockerfile: docker/Dockerfile-Plugins
   netbox-housekeeping:
     image: netbox:${NETDOC_IMAGE_TAG:-latest-plugins}
     build:
-      context: ..
+      context: ${NETDOC_PATH:-../netdoc}
       dockerfile: docker/Dockerfile-Plugins

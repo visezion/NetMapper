@@ -3,7 +3,9 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DOCKER_DIR="${DOCKER_DIR:-$REPO_ROOT/docker}"
+NETBOX_DOCKER_DIR="${NETBOX_DOCKER_DIR:-${DOCKER_DIR:-$REPO_ROOT/../netbox-docker}}"
+OVERRIDE_FILE="${OVERRIDE_FILE:-$REPO_ROOT/docker/docker-compose.override.yml}"
+export NETDOC_PATH="${NETDOC_PATH:-$REPO_ROOT}"
 BRANCH="${1:-}"
 ALLOW_DIRTY="${ALLOW_DIRTY:-0}"
 
@@ -16,6 +18,45 @@ CURRENT_COMMIT="$(git rev-parse HEAD)"
 echo "Repository: $REPO_ROOT"
 echo "Branch: $TARGET_BRANCH"
 echo "Current commit: $CURRENT_COMMIT"
+echo "NetBox Docker directory: $NETBOX_DOCKER_DIR"
+echo "Compose override: $OVERRIDE_FILE"
+echo "NETDOC_PATH: $NETDOC_PATH"
+
+if [ ! -f "$NETBOX_DOCKER_DIR/docker-compose.yml" ]; then
+    echo "Could not find netbox-docker compose file at: $NETBOX_DOCKER_DIR/docker-compose.yml"
+    exit 1
+fi
+
+if [ ! -f "$OVERRIDE_FILE" ]; then
+    echo "Could not find NetDoc compose override at: $OVERRIDE_FILE"
+    exit 1
+fi
+
+compose() {
+    docker compose \
+        --project-directory "$NETBOX_DOCKER_DIR" \
+        -f "$NETBOX_DOCKER_DIR/docker-compose.yml" \
+        -f "$OVERRIDE_FILE" \
+        "$@"
+}
+
+wait_for_container_state() {
+    local container_name="$1"
+    local expected_state="$2"
+    local timeout_seconds="${3:-120}"
+    local status=""
+
+    for _ in $(seq 1 "$timeout_seconds"); do
+        status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_name" 2>/dev/null || true)"
+        if [ "$status" = "$expected_state" ]; then
+            return 0
+        fi
+        sleep 1
+    done
+
+    echo "Container $container_name did not reach state '$expected_state' in ${timeout_seconds}s."
+    return 1
+}
 
 if [ "$ALLOW_DIRTY" != "1" ] && [ -n "$(git status --short)" ]; then
     echo "Refusing to deploy from a dirty working tree."
@@ -37,24 +78,18 @@ export NETDOC_IMAGE_TAG="netdoc-${SHORT_COMMIT}"
 echo "Deploying commit: $UPDATED_COMMIT"
 echo "Docker image tag: netbox:${NETDOC_IMAGE_TAG}"
 
-cd "$DOCKER_DIR"
-
-docker compose down --remove-orphans || true
+compose up -d postgres redis redis-cache
+wait_for_container_state netbox-docker-postgres-1 healthy 120
+wait_for_container_state netbox-docker-redis-1 healthy 60
+wait_for_container_state netbox-docker-redis-cache-1 healthy 60
 docker image rm -f "netbox:${NETDOC_IMAGE_TAG}" || true
-docker compose build --pull --no-cache netbox netbox-worker netbox-housekeeping
-docker compose run --rm --no-deps netbox /opt/netbox/venv/bin/python -c "import pathlib, netdoc; print('Imported:', netdoc.__file__); source = pathlib.Path(netdoc.__file__).read_text(); assert 'getattr(extras_models, \"ReportModule\", None)' in source; print('NetDoc image verification passed')"
-docker compose up -d --force-recreate netbox netbox-worker netbox-housekeeping
-for _ in $(seq 1 60); do
-    NETBOX_STATE="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' netbox-docker-netbox-1 2>/dev/null || true)"
-    if [ "$NETBOX_STATE" = "healthy" ]; then
-        break
-    fi
-    sleep 2
-done
-if [ "${NETBOX_STATE:-}" != "healthy" ]; then
+compose build --pull --no-cache netbox netbox-worker netbox-housekeeping
+compose run --rm --no-deps netbox /opt/netbox/venv/bin/python -c "import pathlib, netdoc; print('Imported:', netdoc.__file__); source = pathlib.Path(netdoc.__file__).read_text(); assert 'getattr(extras_models, \"ReportModule\", None)' in source; print('NetDoc image verification passed')"
+compose up -d --force-recreate netbox netbox-worker netbox-housekeeping
+if ! wait_for_container_state netbox-docker-netbox-1 healthy 180; then
     echo "NetBox container did not become healthy in time."
-    docker compose logs --tail=100 netbox
+    compose logs --tail=100 netbox
     exit 1
 fi
-docker compose exec -T netbox /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py shell -c "from netdoc import sync_plugin_assets; sync_plugin_assets(); print('NetDoc asset sync passed')"
-docker compose logs --tail=100 netbox
+compose exec -T netbox /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py shell -c "from netdoc import sync_plugin_assets; sync_plugin_assets(); print('NetDoc asset sync passed')"
+compose logs --tail=100 netbox
