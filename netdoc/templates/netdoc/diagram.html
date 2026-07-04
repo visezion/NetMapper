@@ -27,6 +27,9 @@ __license__ = "GPLv3"
 {% endblock tabs %}
 {% block content %}
     <div class="h-100 p-0">
+        <form class="d-none" aria-hidden="true">
+            {% csrf_token %}
+        </form>
         {% if topology_empty_message %}
             <div class="alert alert-warning m-3" role="alert">
                 {{ topology_empty_message }}

@@ -22,6 +22,20 @@ function getCookie(name) {
     return cookieValue;
 }
 
+function getCsrfToken() {
+    var csrftoken = getCookie("csrftoken");
+    if (csrftoken) {
+        return csrftoken;
+    }
+
+    var tokenField = document.querySelector('input[name="csrfmiddlewaretoken"]');
+    if (tokenField) {
+        return tokenField.value;
+    }
+
+    return null;
+}
+
 function addMessage(severity, text) {
     var container = document.createElement("div");
     container.setAttribute("class", "django-message toast align-items-center border-0 bg-" + severity + " fade show");

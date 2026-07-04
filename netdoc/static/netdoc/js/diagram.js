@@ -70,7 +70,7 @@ function getDiagramId() {
 // Save node positions
 function saveNodePositions() {
     // Load CSRF token
-    var csrftoken = getCookie('csrftoken')
+    var csrftoken = getCsrfToken();
 
     var physics = graph.physics.physicsEnabled;
     var diagram_id = getDiagramId();
@@ -95,6 +95,9 @@ function saveNodePositions() {
         } else {
             addMessage("danger", "Failed to save diagram (HTTP " + xhr.status + ")");
         }
+    };
+    xhr.onerror = () => {
+        addMessage("danger", "Failed to save diagram");
     };
     xhr.send(data);
 }
