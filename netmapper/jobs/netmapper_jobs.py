@@ -44,11 +44,23 @@ from netmapper.dictionaries import (
     DeviceImageChoices,
     FilterModeChoices,
 )
+from netmapper.network_discovery import (
+    estimate_target_host_count,
+    infer_discovery_mode,
+    parse_target_specs,
+    run_nmap_ping_scan,
+    run_snmp_identity_probe,
+)
 
 PLUGIN_SETTINGS = settings.PLUGINS_CONFIG.get("netmapper", {})
 NORNIR_LOG = PLUGIN_SETTINGS.get("NORNIR_LOG")
 MAX_INGESTED_LOGS = PLUGIN_SETTINGS.get("MAX_INGESTED_LOGS")
 DISCOVERY_BATCH_SIZE = max(1, PLUGIN_SETTINGS.get("DISCOVERY_BATCH_SIZE", 10))
+NMAP_EXECUTABLE = PLUGIN_SETTINGS.get("NMAP_EXECUTABLE", "nmap")
+SNMPGET_EXECUTABLE = PLUGIN_SETTINGS.get("SNMPGET_EXECUTABLE", "snmpget")
+NMAP_HOST_TIMEOUT = PLUGIN_SETTINGS.get("NMAP_HOST_TIMEOUT", 30)
+SNMP_TIMEOUT = PLUGIN_SETTINGS.get("SNMP_TIMEOUT", 2)
+SUBNET_SCAN_MAX_HOSTS = PLUGIN_SETTINGS.get("SUBNET_SCAN_MAX_HOSTS", 4096)
 
 
 def _normalize_filters(raw_filters):
@@ -238,6 +250,235 @@ class AddDiscoverable(Script):
         log_qs = DiscoveryLog_m.objects.filter(ingested=False, parsed=True)
         self.log_info(f"{len(log_qs)} logs to be ingested")
 
+        return output
+
+
+class ScanNetwork(Script):
+    """Seed discoverables from a subnet/range using Nmap and optional SNMP."""
+
+    class Meta:
+        """Script metadata."""
+
+        name = "Scan subnet or range"
+        description = (
+            "Use Nmap to find live hosts in subnets/ranges, optionally infer the "
+            "platform with SNMP, create discoverables, and queue discovery."
+        )
+        commit_default = True
+
+    credential = ObjectVar(
+        model=Credential_m,
+        description="Credential attached to created discoverables.",
+        required=True,
+    )
+    default_mode = ChoiceVar(
+        choices=DiscoveryModeChoices.CHOICES,
+        description="Fallback discovery mode when SNMP cannot infer a platform.",
+        required=True,
+    )
+    site = ObjectVar(
+        model=Site,
+        description="Site associated with responsive hosts.",
+        required=True,
+    )
+    targets = TextVar(
+        description=(
+            "IP addresses, CIDRs, or full IP ranges separated by comma, space, or newline."
+        ),
+        required=True,
+    )
+    snmp_community = StringVar(
+        description="Optional SNMP v2c community used to infer platform identity.",
+        required=False,
+    )
+    discover_now = BooleanVar(
+        description="Queue the normal NetMapper discovery workflow after seeding hosts.",
+        required=False,
+        default=True,
+    )
+    overwrite_mode = BooleanVar(
+        description="Allow inferred/fallback mode to overwrite an existing discoverable mode.",
+        required=False,
+        default=False,
+    )
+    max_hosts = IntegerVar(
+        description="Safety cap for the total number of IPs covered by the request.",
+        required=False,
+        default=SUBNET_SCAN_MAX_HOSTS,
+    )
+    nmap_host_timeout = IntegerVar(
+        description="Per-host Nmap timeout in seconds.",
+        required=False,
+        default=NMAP_HOST_TIMEOUT,
+    )
+    snmp_timeout = IntegerVar(
+        description="SNMP timeout in seconds for each responsive host.",
+        required=False,
+        default=SNMP_TIMEOUT,
+    )
+    filters = StringVar(
+        description="Filter command based on words separated by comma (e.g. mac,route).",
+        required=False,
+    )
+    filter_type = ChoiceVar(
+        choices=FilterModeChoices.CHOICES,
+        description="Filter type for the queued discovery job.",
+        required=True,
+        default="exclude",
+    )
+
+    def run(self, data, commit):
+        """Scan a subnet/range, create discoverables, and optionally discover them."""
+        if not commit:
+            self.log_warning("Commit not set, using dry-run mode")
+
+        credential_o = data.get("credential")
+        site_o = data.get("site")
+        default_mode = data.get("default_mode")
+        overwrite_mode = data.get("overwrite_mode")
+        discover_now = data.get("discover_now")
+        snmp_community = (data.get("snmp_community") or "").strip()
+        filters = _normalize_filters(data.get("filters"))
+        filter_type = data.get("filter_type")
+
+        target_specs, invalid_targets = parse_target_specs(data.get("targets"))
+        for invalid_target in invalid_targets:
+            self.log_warning(f"Skipping invalid target {invalid_target}")
+
+        if not target_specs:
+            self.log_failure("No valid targets were supplied")
+            return ""
+
+        estimated_hosts = estimate_target_host_count(target_specs)
+        max_hosts = data.get("max_hosts") or SUBNET_SCAN_MAX_HOSTS
+        if estimated_hosts > max_hosts:
+            self.log_failure(
+                f"Requested scan covers {estimated_hosts} IPs which exceeds the safety cap of {max_hosts}"
+            )
+            return ""
+
+        self.log_info(
+            f"Scanning {len(target_specs)} target specs covering approximately {estimated_hosts} IPs"
+        )
+
+        try:
+            hosts = run_nmap_ping_scan(
+                target_specs,
+                host_timeout=data.get("nmap_host_timeout") or NMAP_HOST_TIMEOUT,
+                executable=NMAP_EXECUTABLE,
+            )
+        except RuntimeError as exc:
+            self.log_failure(str(exc))
+            return ""
+
+        if not hosts:
+            self.log_warning("Nmap did not find any responsive hosts")
+            return ""
+
+        created_count = 0
+        updated_count = 0
+        reused_count = 0
+        scan_discoverables = []
+
+        for host in hosts:
+            selected_mode = default_mode
+            snmp_details = None
+            inferred_mode = None
+
+            if snmp_community:
+                try:
+                    snmp_details = run_snmp_identity_probe(
+                        address=host.address,
+                        community=snmp_community,
+                        timeout=data.get("snmp_timeout") or SNMP_TIMEOUT,
+                        executable=SNMPGET_EXECUTABLE,
+                    )
+                except RuntimeError as exc:
+                    self.log_failure(str(exc))
+                    return ""
+
+                if snmp_details.error:
+                    self.log_warning(
+                        f"{host.address}: SNMP identity probe failed ({snmp_details.error})"
+                    )
+                else:
+                    inferred_mode = infer_discovery_mode(
+                        sys_descr=snmp_details.sys_descr,
+                        sys_object_id=snmp_details.sys_object_id,
+                        hostname=snmp_details.sys_name or host.hostname,
+                        vendor=host.vendor,
+                    )
+                    if inferred_mode:
+                        selected_mode = inferred_mode
+
+            discoverable_o = Discoverable_m.objects.filter(address=host.address).first()
+            if discoverable_o:
+                change_list = []
+                if discoverable_o.credential_id != credential_o.pk:
+                    discoverable_o.credential = credential_o
+                    change_list.append("credential")
+                if discoverable_o.site_id != site_o.pk:
+                    discoverable_o.site = site_o
+                    change_list.append("site")
+                if not discoverable_o.discoverable:
+                    discoverable_o.discoverable = True
+                    change_list.append("discoverable")
+                if overwrite_mode and discoverable_o.mode != selected_mode:
+                    discoverable_o.mode = selected_mode
+                    change_list.append("mode")
+
+                if change_list:
+                    discoverable_o.save()
+                    updated_count += 1
+                    self.log_info(
+                        f"Updated discoverable {discoverable_o.address} ({', '.join(change_list)})"
+                    )
+                else:
+                    reused_count += 1
+                    self.log_info(f"Reusing discoverable {discoverable_o.address}")
+            else:
+                discoverable_o, _ = discoverable.get_or_create(
+                    address=host.address,
+                    site_id=site_o.pk,
+                    mode=selected_mode,
+                    credential_id=credential_o.pk,
+                    discoverable=True,
+                )
+                created_count += 1
+                self.log_info(
+                    f"Created discoverable {discoverable_o.address} using mode {selected_mode}"
+                )
+
+            scan_discoverables.append(discoverable_o)
+
+            identity_fragments = []
+            if host.hostname:
+                identity_fragments.append(f"nmap hostname={host.hostname}")
+            if host.vendor:
+                identity_fragments.append(f"vendor={host.vendor}")
+            if snmp_details and snmp_details.sys_name:
+                identity_fragments.append(f"snmp sysName={snmp_details.sys_name}")
+            if snmp_details and snmp_details.sys_descr:
+                identity_fragments.append(f"snmp sysDescr={snmp_details.sys_descr}")
+            if inferred_mode:
+                identity_fragments.append(f"inferred mode={inferred_mode}")
+            if identity_fragments:
+                self.log_info(f"{host.address}: {'; '.join(identity_fragments)}")
+
+        self.log_info(
+            f"Scan complete: {created_count} created, {updated_count} updated, {reused_count} reused"
+        )
+
+        if not discover_now:
+            return ""
+
+        output = _spawn_discovery_batch(
+            self,
+            scan_discoverables,
+            filters=filters,
+            filter_type=filter_type,
+        )
+        self.log_info("Queued NetMapper discovery for responsive hosts")
         return output
 
 

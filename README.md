@@ -15,6 +15,7 @@ This repository is maintained as the `visezion/NetMapper` fork and is targeted a
 NetMapper currently provides:
 
 - multi-vendor CLI discovery through Nornir and Netmiko
+- subnet/range seeding with `nmap` plus optional SNMP-assisted mode inference
 - device, interface, IP, route, ARP, MAC, and topology ingestion
 - L2, L3, and site diagrams inside NetBox
 - a Docker deployment flow for `netbox-docker`
@@ -85,8 +86,17 @@ python3 manage.py runserver
 - The deployment tooling still accepts a legacy `NETDOC_PATH` environment variable as a fallback to ease migration from older checkouts.
 - Historical source attribution and licensing remain in the codebase because this project is a maintained fork, not a greenfield rewrite.
 
+## Network Seeding
+
+Use the `Scan subnet or range` script job to:
+
+- scan one or more IPs, CIDRs, or full IP ranges with `nmap`
+- optionally probe responsive hosts with SNMP v2c for `sysName` and `sysDescr`
+- infer a best-fit discovery mode when possible
+- create or update `Discoverable` records and optionally queue the normal discovery workflow
+
 ## Planned work
 
 - streamlined fresh-server install documentation
-- subnet discovery workflows
-- SNMP-assisted enrichment for broader non-CLI discovery
+- deeper SNMP enrichment for VLAN/interface/neighbor modeling
+- dedicated subnet discovery UI beyond NetBox script jobs

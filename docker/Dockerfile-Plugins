@@ -3,7 +3,7 @@ FROM netboxcommunity/netbox:v4.6
 COPY docker/plugin_requirements.txt /tmp/plugin_requirements.txt
 COPY . /opt/netbox/netmapper-source
 RUN apt-get update
-RUN apt-get -y install git
+RUN apt-get -y install git nmap snmp
 RUN git clone --depth=1 https://github.com/networktocode/ntc-templates /opt/ntc-templates
 RUN if grep -Eq '^[[:space:]]*[^#[:space:]]' /tmp/plugin_requirements.txt; then \
         uv pip install --python /opt/netbox/venv/bin/python --system -r /tmp/plugin_requirements.txt; \

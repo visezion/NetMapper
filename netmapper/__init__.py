@@ -136,11 +136,16 @@ class NetmapperConfig(PluginConfig):
     required_settings = []
     default_settings = {
         "MAX_INGESTED_LOGS": 25,
+        "NMAP_EXECUTABLE": "nmap",
+        "NMAP_HOST_TIMEOUT": 30,
         "NORNIR_LOG": os.path.join(get_base_dir(), "nornir.log"),
         "NORNIR_TIMEOUT": 300,
         "RAISE_ON_CDP_FAIL": True,
         "RAISE_ON_LLDP_FAIL": True,
         "ROLE_MAP": {},
+        "SNMPGET_EXECUTABLE": "snmpget",
+        "SNMP_TIMEOUT": 2,
+        "SUBNET_SCAN_MAX_HOSTS": 4096,
         "SYNC_ON_STARTUP": False,
     }
 
