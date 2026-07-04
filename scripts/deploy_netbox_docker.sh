@@ -85,13 +85,13 @@ wait_for_container_state netbox-docker-redis-cache-1 healthy 60
 docker image rm -f "netbox:${NETDOC_IMAGE_TAG}" || true
 compose build --pull --no-cache netbox netbox-worker
 compose run --rm --no-deps netbox /opt/netbox/venv/bin/python -c "import pathlib, netdoc; print('Imported:', netdoc.__file__); source = pathlib.Path(netdoc.__file__).read_text(); assert 'getattr(extras_models, \"ReportModule\", None)' in source; print('NetDoc image verification passed')"
-compose up -d --force-recreate netbox
+compose up -d --remove-orphans --force-recreate netbox
 if ! wait_for_container_state netbox-docker-netbox-1 healthy 180; then
     echo "NetBox container did not become healthy in time."
     compose logs --tail=100 netbox
     exit 1
 fi
-compose up -d --force-recreate netbox-worker
+compose up -d --remove-orphans --force-recreate netbox-worker
 wait_for_container_state netbox-docker-netbox-worker-1 healthy 120
 compose exec -T netbox /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py shell -c "from netdoc import sync_plugin_assets; sync_plugin_assets(); print('NetDoc asset sync passed')"
 compose logs --tail=100 netbox
