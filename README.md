@@ -32,8 +32,10 @@ The script:
 * updates the checked out branch using `git pull --ff-only`
 * prints the exact Git commit being deployed
 * refuses to deploy from a dirty working tree by default
+* uses the NetDoc repo's `plugins.py` directly, so `netbox-docker` does not need manual plugin file edits
 * validates the built image can import the expected patched `netdoc`
 * rebuilds the NetBox plugin image with `--no-cache`
+* starts Postgres and Redis first on a fresh server, then starts the NetBox app containers
 * restarts `netbox`, `netbox-worker`, and `netbox-housekeeping`
 * prints the latest `netbox` container logs
 

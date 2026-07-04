@@ -20,5 +20,5 @@ RUN SITE_PACKAGES=$(/opt/netbox/venv/bin/python -c "import site; print(site.gets
 RUN /opt/netbox/venv/bin/python -c "import pathlib, site; path = pathlib.Path(site.getsitepackages()[0]) / 'netdoc' / '__init__.py'; print(path); source = path.read_text(); assert 'getattr(extras_models, \"ReportModule\", None)' in source, path"
 
 # These lines are only required if your plugin has its own static files.
-COPY docker/configuration/configuration.py /etc/netbox/config/configuration.py
+COPY docker/configuration/plugins.py /etc/netbox/config/plugins.py
 RUN SECRET_KEY="dummydummydummydummydummydummydummydummydummydummy" /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py collectstatic --no-input
