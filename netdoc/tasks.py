@@ -90,7 +90,7 @@ def discovery(addresses=None, script_handler=None, filters=None, filter_type=Non
             f"Norninr inventory includes {', '.join(nornir_addresses)}"
         )
 
-    if filters:
+    if filters and script_handler:
         script_handler.log_info(
             f"The following {filter_type} filter has been configured {', '.join(filters)}"
         )
