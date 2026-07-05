@@ -1,16 +1,20 @@
 """Tests for subnet/range discovery helpers."""
 
 from django.test import SimpleTestCase
+from unittest.mock import patch
 
 from netmapper.network_discovery import (
     build_identity_note,
     build_scan_plan,
+    expand_target_spec_addresses,
     estimate_target_host_count,
     infer_discovery_mode,
     merge_identity_note,
+    run_snmp_identity_probe,
     parse_nmap_xml_hosts,
     parse_snmpget_output,
     parse_target_specs,
+    scan_host_candidates,
     NmapHostResult,
     SnmpHostMetadata,
 )
@@ -48,6 +52,23 @@ class NetworkDiscoveryHelperTest(SimpleTestCase):
         self.assertEqual(plan.estimated_host_count, 5)
         self.assertTrue(plan.exceeds_max_hosts)
 
+    def test_expand_target_spec_addresses(self):
+        """Target expansion should preserve host addresses in order."""
+        addresses = expand_target_spec_addresses(
+            ["192.0.2.1", "192.0.2.10-192.0.2.12", "192.0.2.4/31"]
+        )
+        self.assertEqual(
+            addresses,
+            [
+                "192.0.2.1",
+                "192.0.2.10",
+                "192.0.2.11",
+                "192.0.2.12",
+                "192.0.2.4",
+                "192.0.2.5",
+            ],
+        )
+
     def test_parse_nmap_xml_hosts(self):
         """Nmap XML should produce responsive host records."""
         xml_output = """
@@ -81,6 +102,47 @@ class NetworkDiscoveryHelperTest(SimpleTestCase):
         self.assertEqual(metadata.sys_name, "core-sw1")
         self.assertEqual(metadata.sys_descr, "Cisco IOS Software, C9300")
         self.assertEqual(metadata.sys_object_id, "1.3.6.1.4.1.9.1.1745")
+
+    @patch("netmapper.network_discovery.subprocess.run")
+    def test_run_snmp_identity_probe_handles_multiline_sysdescr(self, mock_run):
+        """SNMP identity probing should preserve multiline sysDescr output."""
+        mock_run.side_effect = [
+            type("Result", (), {"returncode": 0, "stdout": "edge-sw1\n", "stderr": ""})(),
+            type(
+                "Result",
+                (),
+                {
+                    "returncode": 0,
+                    "stdout": (
+                        "Cisco IOS Software, C2960 Software (C2960-LANBASEK9-M), Version 12.2(55)SE1\n"
+                        "Technical Support: http://www.cisco.com/techsupport\n"
+                        "Compiled Thu 02-Dec-10 08:16 by prod_rel_team\n"
+                    ),
+                    "stderr": "",
+                },
+            )(),
+            type(
+                "Result",
+                (),
+                {
+                    "returncode": 0,
+                    "stdout": "1.3.6.1.4.1.9.1.516\n",
+                    "stderr": "",
+                },
+            )(),
+        ]
+
+        metadata = run_snmp_identity_probe(
+            address="192.0.2.10",
+            community="public",
+            executable="snmpget",
+        )
+
+        self.assertEqual(metadata.sys_name, "edge-sw1")
+        self.assertIn("Cisco IOS Software", metadata.sys_descr)
+        self.assertIn("Technical Support", metadata.sys_descr)
+        self.assertEqual(metadata.sys_object_id, "1.3.6.1.4.1.9.1.516")
+        self.assertIsNone(metadata.error)
 
     def test_infer_discovery_mode(self):
         """SNMP fingerprints should map to known discovery modes."""
@@ -137,3 +199,47 @@ class NetworkDiscoveryHelperTest(SimpleTestCase):
         merged = merge_identity_note("Existing comments", note)
         self.assertIn("Existing comments", merged)
         self.assertIn("Network scan identity", merged)
+
+    @patch("netmapper.network_discovery.run_snmp_identity_probe")
+    @patch("netmapper.network_discovery.run_nmap_ping_scan")
+    def test_scan_host_candidates_probes_snmp_for_hosts_missed_by_nmap(
+        self, mock_nmap_scan, mock_snmp_probe
+    ):
+        """SNMP fallback should include hosts that ping discovery misses."""
+        mock_nmap_scan.return_value = [
+            NmapHostResult(address="192.0.2.15", hostname="seen-by-nmap")
+        ]
+
+        def snmp_side_effect(address, **kwargs):
+            suffix = address.rsplit(".", maxsplit=1)[-1]
+            return SnmpHostMetadata(
+                address=address,
+                sys_name=f"sw-{suffix}",
+                sys_descr="Cisco IOS Software, C2960 Software",
+                sys_object_id=f"1.3.6.1.4.1.9.1.5{suffix}",
+            )
+
+        mock_snmp_probe.side_effect = snmp_side_effect
+
+        candidates = scan_host_candidates(
+            ["192.0.2.10-192.0.2.15"],
+            default_mode="linux",
+            snmp_community="public",
+            host_timeout=10,
+            snmp_timeout=2,
+        )
+
+        self.assertEqual([candidate.host.address for candidate in candidates], [
+            "192.0.2.15",
+            "192.0.2.10",
+            "192.0.2.11",
+            "192.0.2.12",
+            "192.0.2.13",
+            "192.0.2.14",
+        ])
+        self.assertTrue(
+            all(candidate.selected_mode == "netmiko_cisco_ios" for candidate in candidates)
+        )
+        self.assertTrue(
+            all(candidate.snmp_metadata and candidate.snmp_metadata.sys_name for candidate in candidates)
+        )

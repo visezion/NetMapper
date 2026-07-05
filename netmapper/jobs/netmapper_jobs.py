@@ -62,6 +62,7 @@ DISCOVERY_BATCH_SIZE = max(1, PLUGIN_SETTINGS.get("DISCOVERY_BATCH_SIZE", 10))
 NMAP_EXECUTABLE = PLUGIN_SETTINGS.get("NMAP_EXECUTABLE", "nmap")
 SNMPGET_EXECUTABLE = PLUGIN_SETTINGS.get("SNMPGET_EXECUTABLE", "snmpget")
 NMAP_HOST_TIMEOUT = PLUGIN_SETTINGS.get("NMAP_HOST_TIMEOUT", 30)
+SNMP_FALLBACK_MAX_HOSTS = PLUGIN_SETTINGS.get("SNMP_FALLBACK_MAX_HOSTS", 256)
 SNMP_TIMEOUT = PLUGIN_SETTINGS.get("SNMP_TIMEOUT", 2)
 SUBNET_SCAN_MAX_HOSTS = PLUGIN_SETTINGS.get("SUBNET_SCAN_MAX_HOSTS", 4096)
 
@@ -458,6 +459,7 @@ class ScanNetwork(Script):
                 snmp_timeout=data.get("snmp_timeout") or SNMP_TIMEOUT,
                 nmap_executable=NMAP_EXECUTABLE,
                 snmp_executable=SNMPGET_EXECUTABLE,
+                snmp_fallback_max_hosts=SNMP_FALLBACK_MAX_HOSTS,
             )
         except RuntimeError as exc:
             self._save_scan_record(

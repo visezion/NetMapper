@@ -149,6 +149,32 @@ def estimate_target_host_count(target_specs: Iterable[str]) -> int:
     return total
 
 
+def expand_target_spec_addresses(target_specs: Iterable[str]) -> list[str]:
+    """Expand target specs into individual host addresses."""
+    expanded = []
+    for target in target_specs:
+        if "-" in target and "/" not in target:
+            start, end = target.split("-", maxsplit=1)
+            start_ip = ipaddress.ip_address(start)
+            end_ip = ipaddress.ip_address(end)
+            current = int(start_ip)
+            while current <= int(end_ip):
+                expanded.append(ipaddress.ip_address(current).compressed)
+                current += 1
+            continue
+
+        if "/" in target:
+            network = ipaddress.ip_network(target, strict=False)
+            expanded.extend(address.compressed for address in network.hosts())
+            if network.num_addresses == 1:
+                expanded.append(network.network_address.compressed)
+            continue
+
+        expanded.append(ipaddress.ip_address(target).compressed)
+
+    return list(dict.fromkeys(expanded))
+
+
 def parse_nmap_xml_hosts(xml_output):
     """Parse Nmap XML output and return responsive hosts."""
     parsed = xmltodict.parse(xml_output)
@@ -248,16 +274,17 @@ def parse_snmpget_output(address, output):
     )
 
 
-def run_snmp_identity_probe(
+def _run_snmpget_value(
     address,
     community,
+    oid,
     port=161,
     version="v2c",
     timeout=2,
     retries=0,
     executable="snmpget",
 ):
-    """Query basic SNMP identity fields for a host."""
+    """Query a single SNMP value and return the normalized response."""
     target = address
     if port and int(port) != 161:
         if ":" in address and not address.startswith("["):
@@ -275,9 +302,7 @@ def run_snmp_identity_probe(
         str(retries),
         "-Oqv",
         target,
-        "1.3.6.1.2.1.1.5.0",  # sysName.0
-        "1.3.6.1.2.1.1.1.0",  # sysDescr.0
-        "1.3.6.1.2.1.1.2.0",  # sysObjectID.0
+        oid,
     ]
     try:
         result = subprocess.run(
@@ -293,9 +318,63 @@ def run_snmp_identity_probe(
 
     if result.returncode != 0:
         error = (result.stderr or result.stdout or "").strip() or "SNMP probe failed"
-        return SnmpHostMetadata(address=address, error=error)
+        return None, error
 
-    return parse_snmpget_output(address, result.stdout)
+    return _normalize_snmp_value(result.stdout), None
+
+
+def snmp_metadata_has_identity(metadata):
+    """Return True when SNMP metadata contains any useful identity field."""
+    return bool(
+        metadata
+        and (
+            metadata.sys_name
+            or metadata.sys_descr
+            or metadata.sys_object_id
+        )
+    )
+
+
+def run_snmp_identity_probe(
+    address,
+    community,
+    port=161,
+    version="v2c",
+    timeout=2,
+    retries=0,
+    executable="snmpget",
+):
+    """Query basic SNMP identity fields for a host."""
+    oid_map = {
+        "sys_name": "1.3.6.1.2.1.1.5.0",
+        "sys_descr": "1.3.6.1.2.1.1.1.0",
+        "sys_object_id": "1.3.6.1.2.1.1.2.0",
+    }
+    values = {}
+    errors = []
+
+    for field, oid in oid_map.items():
+        value, error = _run_snmpget_value(
+            address=address,
+            community=community,
+            oid=oid,
+            port=port,
+            version=version,
+            timeout=timeout,
+            retries=retries,
+            executable=executable,
+        )
+        values[field] = value
+        if error:
+            errors.append(f"{field}: {error}")
+
+    return SnmpHostMetadata(
+        address=address,
+        sys_name=values["sys_name"],
+        sys_descr=values["sys_descr"],
+        sys_object_id=values["sys_object_id"],
+        error="; ".join(errors) if errors and not any(values.values()) else None,
+    )
 
 
 def build_identity_note(
@@ -376,6 +455,7 @@ def scan_host_candidates(
     snmp_timeout=2,
     nmap_executable="nmap",
     snmp_executable="snmpget",
+    snmp_fallback_max_hosts=256,
 ):
     """Run the scan and return enriched host candidates without persisting them."""
     hosts = run_nmap_ping_scan(
@@ -383,13 +463,37 @@ def scan_host_candidates(
         host_timeout=host_timeout,
         executable=nmap_executable,
     )
+    hosts_by_address = {host.address: host for host in hosts}
+    snmp_metadata_by_address = {}
+
+    if snmp_community:
+        target_addresses = expand_target_spec_addresses(target_specs)
+        if len(target_addresses) <= int(snmp_fallback_max_hosts):
+            for address in target_addresses:
+                if address in hosts_by_address:
+                    continue
+                snmp_metadata = run_snmp_identity_probe(
+                    address=address,
+                    community=snmp_community,
+                    port=snmp_port,
+                    version=snmp_version,
+                    timeout=snmp_timeout,
+                    executable=snmp_executable,
+                )
+                if not snmp_metadata_has_identity(snmp_metadata):
+                    continue
+                fallback_host = NmapHostResult(address=address, status="up")
+                hosts.append(fallback_host)
+                hosts_by_address[address] = fallback_host
+                snmp_metadata_by_address[address] = snmp_metadata
+
     candidates = []
     for host in hosts:
         selected_mode = default_mode
         inferred_mode = None
-        snmp_metadata = None
+        snmp_metadata = snmp_metadata_by_address.get(host.address)
 
-        if snmp_community:
+        if snmp_community and snmp_metadata is None:
             snmp_metadata = run_snmp_identity_probe(
                 address=host.address,
                 community=snmp_community,
@@ -398,7 +502,7 @@ def scan_host_candidates(
                 timeout=snmp_timeout,
                 executable=snmp_executable,
             )
-            if not snmp_metadata.error:
+            if snmp_metadata_has_identity(snmp_metadata):
                 inferred_mode = infer_discovery_mode(
                     sys_descr=snmp_metadata.sys_descr,
                     sys_object_id=snmp_metadata.sys_object_id,
@@ -407,6 +511,15 @@ def scan_host_candidates(
                 )
                 if inferred_mode:
                     selected_mode = inferred_mode
+        elif snmp_metadata_has_identity(snmp_metadata):
+            inferred_mode = infer_discovery_mode(
+                sys_descr=snmp_metadata.sys_descr,
+                sys_object_id=snmp_metadata.sys_object_id,
+                hostname=snmp_metadata.sys_name or host.hostname,
+                vendor=host.vendor,
+            )
+            if inferred_mode:
+                selected_mode = inferred_mode
 
         identity_note = build_identity_note(
             host,

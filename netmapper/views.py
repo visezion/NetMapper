@@ -8,8 +8,10 @@ import logging
 import json
 
 from django.contrib.auth.mixins import PermissionRequiredMixin
+from django.conf import settings
 from django.db.models import Count
 from django.contrib import messages
+from django.core.exceptions import ImproperlyConfigured
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.http import HttpResponse
@@ -40,6 +42,11 @@ from netmapper.network_discovery import (
     candidate_to_summary,
     scan_host_candidates,
 )
+
+try:
+    PLUGIN_SETTINGS = settings.PLUGINS_CONFIG.get("netmapper", {})
+except ImproperlyConfigured:
+    PLUGIN_SETTINGS = {}
 
 
 class BulkDiscoverAction(ObjectAction):
@@ -396,6 +403,9 @@ class NetworkScanView(PermissionRequiredMixin, FormView):
                     snmp_version=post_data["snmp_version"],
                     host_timeout=post_data["nmap_host_timeout"],
                     snmp_timeout=post_data["snmp_timeout"],
+                    snmp_fallback_max_hosts=PLUGIN_SETTINGS.get(
+                        "SNMP_FALLBACK_MAX_HOSTS", 256
+                    ),
                 )
             except Exception as exc:  # pylint: disable=broad-except
                 return self._render_preview(form, plan, preview_error=str(exc))

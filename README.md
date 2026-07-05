@@ -336,6 +336,7 @@ Supported `PLUGINS_CONFIG["netmapper"]` settings:
 | `RAISE_ON_LLDP_FAIL` | `True` | fail hard on LLDP problems |
 | `ROLE_MAP` | `{}` | diagram role overrides |
 | `SNMPGET_EXECUTABLE` | `snmpget` | binary used for SNMP probes |
+| `SNMP_FALLBACK_MAX_HOSTS` | `256` | max target count for automatic SNMP fallback when Nmap host discovery misses devices |
 | `SNMP_TIMEOUT` | `2` | SNMP timeout in seconds |
 | `SUBNET_SCAN_MAX_HOSTS` | `4096` | scan safety cap |
 | `SYNC_ON_STARTUP` | `False` | sync jobs/reports automatically on startup |
@@ -349,6 +350,7 @@ PLUGINS_CONFIG = {
         "NMAP_EXECUTABLE": "nmap",
         "SNMPGET_EXECUTABLE": "snmpget",
         "NMAP_HOST_TIMEOUT": 30,
+        "SNMP_FALLBACK_MAX_HOSTS": 256,
         "SNMP_TIMEOUT": 2,
         "SUBNET_SCAN_MAX_HOSTS": 4096,
         "SYNC_ON_STARTUP": False,
@@ -588,6 +590,10 @@ If enable mode fails, verify that the `Credential` includes the correct `enable_
 ### Scan created discoverables but not devices
 
 That usually means the seeding step worked but the later discovery/ingestion path did not complete or was not queued.
+
+### SNMP works but subnet/range scan misses some hosts
+
+If ICMP or default Nmap host discovery is filtered in your environment, NetMapper now performs an automatic SNMP fallback for small scans when an SNMP credential is supplied.
 
 ### Empty diagrams
 

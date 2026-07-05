@@ -144,6 +144,7 @@ class NetmapperConfig(PluginConfig):
         "RAISE_ON_LLDP_FAIL": True,
         "ROLE_MAP": {},
         "SNMPGET_EXECUTABLE": "snmpget",
+        "SNMP_FALLBACK_MAX_HOSTS": 256,
         "SNMP_TIMEOUT": 2,
         "SUBNET_SCAN_MAX_HOSTS": 4096,
         "SYNC_ON_STARTUP": False,
