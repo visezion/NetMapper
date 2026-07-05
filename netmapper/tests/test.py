@@ -45,6 +45,10 @@ from netmapper.utils import log_ingest
 
 TEST_DIRECTORY = path.dirname(path.realpath(__file__))
 
+# Python 3.14 no longer exposes the old unittest alias used by this legacy suite.
+if not hasattr(TestCase, "assertEquals"):
+    TestCase.assertEquals = TestCase.assertEqual
+
 
 def test_devices(test_o, expected_results):
     """Test Device given an expected_results dict."""
