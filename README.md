@@ -239,6 +239,11 @@ What the script does:
 - waits for container health checks
 - runs NetMapper asset synchronization
 
+Notes:
+
+- the first startup on a fresh database can take several minutes while NetBox applies migrations and builds its initial cache
+- this repository overrides the upstream NetBox healthcheck to allow slower first responses on small lab or VM hosts
+
 ### 3. Deploy when your paths differ
 
 ```bash
