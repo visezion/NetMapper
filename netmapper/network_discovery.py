@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import ipaddress
 import re
 import subprocess
+from datetime import datetime, UTC
 from typing import Iterable
 
 import xmltodict
@@ -39,6 +40,38 @@ class SnmpHostMetadata:
     sys_descr: str | None = None
     sys_object_id: str | None = None
     error: str | None = None
+
+
+@dataclass(frozen=True)
+class ScanPlanResult:
+    """Target parsing and sizing result."""
+
+    raw_targets: str
+    normalized_targets: list[str]
+    invalid_targets: list[str]
+    estimated_host_count: int
+    max_hosts: int
+
+    @property
+    def exceeds_max_hosts(self):
+        """Return True when the requested scan exceeds the configured cap."""
+        return self.estimated_host_count > self.max_hosts
+
+
+@dataclass(frozen=True)
+class ScannedHostCandidate:
+    """Host result enriched with SNMP inference and note text."""
+
+    host: NmapHostResult
+    selected_mode: str
+    inferred_mode: str | None = None
+    snmp_metadata: SnmpHostMetadata | None = None
+    identity_note: str | None = None
+
+    @property
+    def snmp_failed(self):
+        """Return True when SNMP was attempted but failed."""
+        return bool(self.snmp_metadata and self.snmp_metadata.error)
 
 
 def _ensure_list(value):
@@ -87,6 +120,19 @@ def parse_target_specs(raw_targets):
         except ValueError:
             invalid_targets.append(token)
     return list(dict.fromkeys(valid_targets)), invalid_targets
+
+
+def build_scan_plan(raw_targets, max_hosts):
+    """Return a full scan plan including normalized targets and safety checks."""
+    normalized_targets, invalid_targets = parse_target_specs(raw_targets)
+    estimated_host_count = estimate_target_host_count(normalized_targets)
+    return ScanPlanResult(
+        raw_targets=raw_targets or "",
+        normalized_targets=normalized_targets,
+        invalid_targets=invalid_targets,
+        estimated_host_count=estimated_host_count,
+        max_hosts=max_hosts,
+    )
 
 
 def estimate_target_host_count(target_specs: Iterable[str]) -> int:
@@ -252,6 +298,134 @@ def run_snmp_identity_probe(
     return parse_snmpget_output(address, result.stdout)
 
 
+def build_identity_note(
+    host,
+    snmp_metadata=None,
+    selected_mode=None,
+    inferred_mode=None,
+):
+    """Build a stable identity note to attach to a discoverable."""
+    lines = [
+        "Network scan identity",
+        f"Observed at: {datetime.now(UTC).isoformat()}",
+        f"Address: {host.address}",
+    ]
+    if host.hostname:
+        lines.append(f"Nmap hostname: {host.hostname}")
+    if host.mac_address:
+        lines.append(f"MAC address: {host.mac_address}")
+    if host.vendor:
+        lines.append(f"MAC vendor: {host.vendor}")
+    if snmp_metadata:
+        if snmp_metadata.sys_name:
+            lines.append(f"SNMP sysName: {snmp_metadata.sys_name}")
+        if snmp_metadata.sys_descr:
+            lines.append(f"SNMP sysDescr: {snmp_metadata.sys_descr}")
+        if snmp_metadata.sys_object_id:
+            lines.append(f"SNMP sysObjectID: {snmp_metadata.sys_object_id}")
+        if snmp_metadata.error:
+            lines.append(f"SNMP probe: {snmp_metadata.error}")
+    if inferred_mode:
+        lines.append(f"Inferred mode: {inferred_mode}")
+    elif selected_mode:
+        lines.append(f"Fallback mode: {selected_mode}")
+    return "\n".join(lines)
+
+
+def merge_identity_note(existing_comments, identity_note):
+    """Append a new identity note without duplicating the exact same text."""
+    existing_comments = (existing_comments or "").strip()
+    identity_note = (identity_note or "").strip()
+    if not identity_note:
+        return existing_comments
+    if not existing_comments:
+        return identity_note
+    if identity_note in existing_comments:
+        return existing_comments
+    return f"{existing_comments}\n\n{identity_note}"
+
+
+def candidate_to_summary(candidate):
+    """Convert an enriched host candidate to JSON-serializable data."""
+    summary = {
+        "address": candidate.host.address,
+        "hostname": candidate.host.hostname,
+        "mac_address": candidate.host.mac_address,
+        "vendor": candidate.host.vendor,
+        "selected_mode": candidate.selected_mode,
+        "inferred_mode": candidate.inferred_mode,
+        "identity_note": candidate.identity_note,
+    }
+    if candidate.snmp_metadata:
+        summary["snmp"] = {
+            "sys_name": candidate.snmp_metadata.sys_name,
+            "sys_descr": candidate.snmp_metadata.sys_descr,
+            "sys_object_id": candidate.snmp_metadata.sys_object_id,
+            "error": candidate.snmp_metadata.error,
+        }
+    return summary
+
+
+def scan_host_candidates(
+    target_specs,
+    default_mode,
+    snmp_community="",
+    snmp_port=161,
+    snmp_version="v2c",
+    host_timeout=30,
+    snmp_timeout=2,
+    nmap_executable="nmap",
+    snmp_executable="snmpget",
+):
+    """Run the scan and return enriched host candidates without persisting them."""
+    hosts = run_nmap_ping_scan(
+        target_specs,
+        host_timeout=host_timeout,
+        executable=nmap_executable,
+    )
+    candidates = []
+    for host in hosts:
+        selected_mode = default_mode
+        inferred_mode = None
+        snmp_metadata = None
+
+        if snmp_community:
+            snmp_metadata = run_snmp_identity_probe(
+                address=host.address,
+                community=snmp_community,
+                port=snmp_port,
+                version=snmp_version,
+                timeout=snmp_timeout,
+                executable=snmp_executable,
+            )
+            if not snmp_metadata.error:
+                inferred_mode = infer_discovery_mode(
+                    sys_descr=snmp_metadata.sys_descr,
+                    sys_object_id=snmp_metadata.sys_object_id,
+                    hostname=snmp_metadata.sys_name or host.hostname,
+                    vendor=host.vendor,
+                )
+                if inferred_mode:
+                    selected_mode = inferred_mode
+
+        identity_note = build_identity_note(
+            host,
+            snmp_metadata=snmp_metadata,
+            selected_mode=selected_mode,
+            inferred_mode=inferred_mode,
+        )
+        candidates.append(
+            ScannedHostCandidate(
+                host=host,
+                selected_mode=selected_mode,
+                inferred_mode=inferred_mode,
+                snmp_metadata=snmp_metadata,
+                identity_note=identity_note,
+            )
+        )
+    return candidates
+
+
 def infer_discovery_mode(
     sys_descr=None,
     sys_object_id=None,
@@ -269,23 +443,34 @@ def infer_discovery_mode(
         return None
     if "palo alto" in fingerprint or "pan-os" in fingerprint or "panos" in fingerprint:
         return "xml_panw_ngfw"
+    if "ios xe" in fingerprint or "ios-xe" in fingerprint or "catalyst" in fingerprint:
+        return "netmiko_cisco_ios"
     if "ios xr" in fingerprint or "cisco xr" in fingerprint:
         return "netmiko_cisco_xr"
-    if "nx-os" in fingerprint or "nxos" in fingerprint or "nexus" in fingerprint:
+    if "nx-os" in fingerprint or "nxos" in fingerprint or "nexus" in fingerprint or "n9k" in fingerprint:
         return "netmiko_cisco_nxos"
     if "cisco ios" in fingerprint or "internetwork operating system" in fingerprint:
         return "netmiko_cisco_ios"
-    if "arubaos-cx" in fingerprint or "aruba cx" in fingerprint or "aoscx" in fingerprint:
+    if "arubaos-cx" in fingerprint or "aruba cx" in fingerprint or "aoscx" in fingerprint or "cx " in fingerprint:
         return "netmiko_aruba_aoscx"
-    if "comware" in fingerprint:
+    if "comware" in fingerprint or "h3c" in fingerprint:
         return "netmiko_hp_comware"
-    if "procurve" in fingerprint or "arubaos-switch" in fingerprint:
+    if "procurve" in fingerprint or "arubaos-switch" in fingerprint or "provision" in fingerprint:
         return "netmiko_hp_procurve"
-    if "huawei" in fingerprint or "vrp" in fingerprint:
+    if "huawei" in fingerprint or "vrp" in fingerprint or "quidway" in fingerprint:
         return "netmiko_huawei_vrp"
     if "allied telesis" in fingerprint or "alliedware plus" in fingerprint or "aw+" in fingerprint:
         return "netmiko_allied_telesis_awplus"
-    if "linux" in fingerprint or "unix" in fingerprint:
+    if (
+        "linux" in fingerprint
+        or "unix" in fingerprint
+        or "ubuntu" in fingerprint
+        or "debian" in fingerprint
+        or "centos" in fingerprint
+        or "red hat" in fingerprint
+        or "almalinux" in fingerprint
+        or "rocky" in fingerprint
+    ):
         return "netmiko_linux"
     if "cisco" in fingerprint:
         return "netmiko_cisco_ios"

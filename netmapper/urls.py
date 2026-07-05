@@ -48,6 +48,11 @@ urlpatterns = (
         name="credential_delete",
     ),
     path(
+        "credential/<int:pk>/test/",
+        views.CredentialTestView.as_view(),
+        name="credential_test",
+    ),
+    path(
         "credential/<int:pk>/changelog/",
         ObjectChangeLogView.as_view(),
         name="credential_changelog",
@@ -82,6 +87,11 @@ urlpatterns = (
         name="snmpcredential_delete",
     ),
     path(
+        "snmp-credential/<int:pk>/test/",
+        views.SnmpCredentialTestView.as_view(),
+        name="snmpcredential_test",
+    ),
+    path(
         "snmp-credential/<int:pk>/changelog/",
         ObjectChangeLogView.as_view(),
         name="snmpcredential_changelog",
@@ -91,6 +101,16 @@ urlpatterns = (
         "scan/",
         views.NetworkScanView.as_view(),
         name="network_scan",
+    ),
+    path(
+        "scan/history/",
+        views.NetworkScanRecordListView.as_view(),
+        name="networkscanrecord_list",
+    ),
+    path(
+        "scan/history/<int:pk>/",
+        views.NetworkScanRecordView.as_view(),
+        name="networkscanrecord",
     ),
     #
     # Diagram urls

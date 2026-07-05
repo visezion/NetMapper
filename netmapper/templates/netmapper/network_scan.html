@@ -1,5 +1,6 @@
 {% extends "base/layout.html" %}
 {% load form_helpers %}
+{% load render_table from django_tables2 %}
 {% comment %}
 __author__ = "Andrea Dainese"
 __contact__ = "andrea@adainese.it"
@@ -20,13 +21,100 @@ __license__ = "GPLv3"
                             with a stored SNMP credential, and create or update NetMapper discoverables.
                         </p>
                         {% render_form form %}
+                        {% if preview_error %}
+                            <div class="alert alert-danger mt-3 mb-0">{{ preview_error }}</div>
+                        {% endif %}
                     </div>
                     <div class="card-footer text-end">
                         <a href="{{ return_url }}" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" name="_preview" class="btn btn-outline-primary">Preview</button>
+                        <button type="submit" name="_dry_run" class="btn btn-outline-secondary">Dry Run</button>
                         <button type="submit" class="btn btn-primary">Start Scan</button>
                     </div>
                 </div>
             </form>
+        </div>
+    </div>
+    {% if preview_plan %}
+        <div class="row mt-3">
+            <div class="col col-md-8 offset-md-2">
+                <div class="card">
+                    <h5 class="card-header">Preview</h5>
+                    <div class="card-body">
+                        <table class="table table-hover attr-table">
+                            <tr>
+                                <th scope="row">Normalized targets</th>
+                                <td>{{ preview_plan.normalized_targets|join:", " }}</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Invalid targets</th>
+                                <td>{% if preview_plan.invalid_targets %}{{ preview_plan.invalid_targets|join:", " }}{% else %}None{% endif %}</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Estimated host count</th>
+                                <td>{{ preview_plan.estimated_host_count }}</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Safety cap</th>
+                                <td>{{ preview_plan.max_hosts }}</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Exceeds safety cap</th>
+                                <td>{{ preview_plan.exceeds_max_hosts|yesno:"Yes,No" }}</td>
+                            </tr>
+                        </table>
+                        {% if preview_summary %}
+                            <hr>
+                            <table class="table table-hover attr-table">
+                                <tr>
+                                    <th scope="row">Responsive hosts</th>
+                                    <td>{{ preview_summary.responsive_hosts_count }}</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">SNMP probe failures</th>
+                                    <td>{{ preview_summary.snmp_failures_count }}</td>
+                                </tr>
+                            </table>
+                            {% if preview_summary.results %}
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Address</th>
+                                                <th>Hostname</th>
+                                                <th>Vendor</th>
+                                                <th>Mode</th>
+                                                <th>SNMP</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for row in preview_summary.results %}
+                                                <tr>
+                                                    <td>{{ row.address }}</td>
+                                                    <td>{{ row.hostname|default:"-" }}</td>
+                                                    <td>{{ row.vendor|default:"-" }}</td>
+                                                    <td>{{ row.selected_mode }}</td>
+                                                    <td>{% if row.snmp.error %}{{ row.snmp.error }}{% elif row.snmp.sys_name %}{{ row.snmp.sys_name }}{% else %}-{% endif %}</td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+    <div class="row mt-3">
+        <div class="col col-md-10 offset-md-1">
+            <div class="card">
+                <h5 class="card-header">Recent Scans</h5>
+                <div class="card-body table-responsive">
+                    {% render_table recent_scans_table %}
+                </div>
+            </div>
         </div>
     </div>
 {% endblock content %}

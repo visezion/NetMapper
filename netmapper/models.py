@@ -264,6 +264,86 @@ class SnmpCredential(NetBoxModel):
         return secrets
 
 
+class NetworkScanStatusChoices(models.TextChoices):
+    """Execution state for network scan history records."""
+
+    QUEUED = "queued", "Queued"
+    RUNNING = "running", "Running"
+    COMPLETED = "completed", "Completed"
+    FAILED = "failed", "Failed"
+
+
+class NetworkScanRecord(NetBoxModel):
+    """Historical record for subnet/range scans launched from NetMapper."""
+
+    site = models.ForeignKey(
+        to="dcim.Site",
+        on_delete=models.CASCADE,
+        related_name="+",
+    )
+    credential = models.ForeignKey(
+        to=Credential,
+        on_delete=models.PROTECT,
+        related_name="+",
+    )
+    snmp_credential = models.ForeignKey(
+        to=SnmpCredential,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        blank=True,
+        null=True,
+    )
+    default_mode = models.CharField(
+        max_length=30,
+        choices=DiscoveryModeChoices,
+    )
+    targets = models.TextField()
+    normalized_targets = models.JSONField(default=list, blank=True)
+    invalid_targets = models.JSONField(default=list, blank=True)
+    filters = models.CharField(max_length=255, blank=True)
+    filter_type = models.CharField(max_length=20, blank=True)
+    discover_now = models.BooleanField(default=True)
+    overwrite_mode = models.BooleanField(default=False)
+    dry_run = models.BooleanField(default=False)
+    store_identity_notes = models.BooleanField(default=True)
+    max_hosts = models.PositiveIntegerField(default=4096)
+    nmap_host_timeout = models.PositiveIntegerField(default=30)
+    snmp_timeout = models.PositiveIntegerField(default=2)
+    estimated_host_count = models.PositiveIntegerField(default=0)
+    responsive_hosts_count = models.PositiveIntegerField(default=0)
+    created_count = models.PositiveIntegerField(default=0)
+    updated_count = models.PositiveIntegerField(default=0)
+    reused_count = models.PositiveIntegerField(default=0)
+    snmp_failures_count = models.PositiveIntegerField(default=0)
+    status = models.CharField(
+        max_length=20,
+        choices=NetworkScanStatusChoices.choices,
+        default=NetworkScanStatusChoices.QUEUED,
+    )
+    job_id = models.CharField(max_length=100, blank=True)
+    started_at = models.DateTimeField(blank=True, null=True)
+    finished_at = models.DateTimeField(blank=True, null=True)
+    summary = models.JSONField(default=dict, blank=True)
+    results = models.JSONField(default=list, blank=True)
+    error = models.TextField(blank=True)
+
+    class Meta:
+        """Database metadata."""
+
+        ordering = ["-created"]
+        verbose_name = "Network scan"
+        verbose_name_plural = "Network scans"
+
+    def __str__(self):
+        """Return a human readable name when the object is printed."""
+        mode = "Dry run" if self.dry_run else "Scan"
+        return f"{mode} {self.created:%Y-%m-%d %H:%M:%S} for {self.site}"
+
+    def get_absolute_url(self):
+        """Return the absolute url."""
+        return reverse("plugins:netmapper:networkscanrecord", args=[self.pk])
+
+
 #
 # Diagram model
 #

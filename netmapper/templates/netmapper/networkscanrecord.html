@@ -1,0 +1,85 @@
+{% extends "generic/object.html" %}
+{% comment %}
+__author__ = "Andrea Dainese"
+__contact__ = "andrea@adainese.it"
+__copyright__ = "Copyright 2022, Andrea Dainese"
+__license__ = "GPLv3"
+{% endcomment %}
+{% block content %}
+    <div class="row mb-3">
+        <div class="col col-md-6">
+            <div class="card">
+                <h5 class="card-header">Network Scan</h5>
+                <div class="card-body">
+                    <table class="table table-hover attr-table">
+                        <tr><th scope="row">Status</th><td>{{ object.get_status_display }}</td></tr>
+                        <tr><th scope="row">Site</th><td>{{ object.site }}</td></tr>
+                        <tr><th scope="row">Credential</th><td>{{ object.credential }}</td></tr>
+                        <tr><th scope="row">SNMP Credential</th><td>{{ object.snmp_credential|default:"-" }}</td></tr>
+                        <tr><th scope="row">Default Mode</th><td>{{ object.default_mode }}</td></tr>
+                        <tr><th scope="row">Dry Run</th><td>{{ object.dry_run|yesno:"Yes,No" }}</td></tr>
+                        <tr><th scope="row">Discover Now</th><td>{{ object.discover_now|yesno:"Yes,No" }}</td></tr>
+                        <tr><th scope="row">Overwrite Mode</th><td>{{ object.overwrite_mode|yesno:"Yes,No" }}</td></tr>
+                        <tr><th scope="row">Store Identity Notes</th><td>{{ object.store_identity_notes|yesno:"Yes,No" }}</td></tr>
+                        <tr><th scope="row">Estimated Host Count</th><td>{{ object.estimated_host_count }}</td></tr>
+                        <tr><th scope="row">Responsive Hosts</th><td>{{ object.responsive_hosts_count }}</td></tr>
+                        <tr><th scope="row">Created</th><td>{{ object.created_count }}</td></tr>
+                        <tr><th scope="row">Updated</th><td>{{ object.updated_count }}</td></tr>
+                        <tr><th scope="row">Reused</th><td>{{ object.reused_count }}</td></tr>
+                        <tr><th scope="row">SNMP Failures</th><td>{{ object.snmp_failures_count }}</td></tr>
+                        <tr><th scope="row">Job ID</th><td>{{ object.job_id|default:"-" }}</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col col-md-6">
+            <div class="card">
+                <h5 class="card-header">Targets</h5>
+                <div class="card-body">
+                    <pre class="mb-0">{{ object.targets }}</pre>
+                </div>
+            </div>
+            {% if object.error %}
+                <div class="card mt-3 border-danger">
+                    <h5 class="card-header text-danger">Error</h5>
+                    <div class="card-body"><pre class="mb-0">{{ object.error }}</pre></div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="row">
+        <div class="col col-md-12">
+            <div class="card">
+                <h5 class="card-header">Results</h5>
+                <div class="card-body table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Address</th>
+                                <th>Hostname</th>
+                                <th>Vendor</th>
+                                <th>Mode</th>
+                                <th>SNMP</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in summary_rows %}
+                                <tr>
+                                    <td>{{ row.address }}</td>
+                                    <td>{{ row.hostname|default:"-" }}</td>
+                                    <td>{{ row.vendor|default:"-" }}</td>
+                                    <td>{{ row.selected_mode }}</td>
+                                    <td>{% if row.snmp.error %}{{ row.snmp.error }}{% elif row.snmp.sys_name %}{{ row.snmp.sys_name }}{% else %}-{% endif %}</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-muted">No result rows recorded.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

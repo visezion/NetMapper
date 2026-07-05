@@ -33,6 +33,11 @@ network_scan_buttons = [
         title="Run",
         icon_class="mdi mdi-radar",
     ),
+    PluginMenuButton(
+        link="plugins:netmapper:networkscanrecord_list",
+        title="History",
+        icon_class="mdi mdi-history",
+    ),
 ]
 
 diagram_buttons = [
@@ -74,6 +79,11 @@ menu_discovery = (
         link_text="Network Scan",
         buttons=network_scan_buttons,
         permissions=["netmapper.change_discoverable"],
+    ),
+    PluginMenuItem(
+        link="plugins:netmapper:networkscanrecord_list",
+        link_text="Scan History",
+        permissions=["netmapper.view_networkscanrecord"],
     ),
     PluginMenuItem(
         link="plugins:netmapper:discoverable_list",

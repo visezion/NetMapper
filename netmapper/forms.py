@@ -36,6 +36,8 @@ from netmapper.models import (
     DiscoveryLog,
     DiscoveryModeChoices,
     DiagramModeChoices,
+    NetworkScanRecord,
+    NetworkScanStatusChoices,
     SnmpCredential,
 )
 from netmapper.dictionaries import FilterModeChoices
@@ -335,6 +337,11 @@ class NetworkScanForm(forms.Form):
         initial=False,
         help_text="Allow the inferred or fallback mode to overwrite existing discoverables.",
     )
+    store_identity_notes = forms.BooleanField(
+        required=False,
+        initial=True,
+        help_text="Store Nmap/SNMP identity details in the discoverable comments field.",
+    )
     max_hosts = forms.IntegerField(
         required=False,
         initial=PLUGIN_SETTINGS.get("SUBNET_SCAN_MAX_HOSTS", 4096),
@@ -362,6 +369,47 @@ class NetworkScanForm(forms.Form):
         required=True,
         initial="exclude",
         help_text="How the optional command filters should be interpreted.",
+    )
+
+
+class CredentialConnectionTestForm(forms.Form):
+    """Form used to test a discovery credential against a target device."""
+
+    address = forms.GenericIPAddressField(help_text="Target management IP address.")
+    mode = forms.ChoiceField(
+        choices=DiscoveryModeChoices,
+        required=True,
+        help_text="Discovery mode to test with this credential.",
+    )
+    timeout = forms.IntegerField(
+        required=False,
+        initial=10,
+        min_value=1,
+        help_text="Connection timeout in seconds.",
+    )
+
+
+class SnmpCredentialConnectionTestForm(forms.Form):
+    """Form used to test an SNMP credential against a target device."""
+
+    address = forms.GenericIPAddressField(help_text="Target management IP address.")
+    timeout = forms.IntegerField(
+        required=False,
+        initial=PLUGIN_SETTINGS.get("SNMP_TIMEOUT", 2),
+        min_value=1,
+        help_text="SNMP timeout in seconds.",
+    )
+
+
+class NetworkScanRecordFilterForm(NetBoxModelFilterSetForm):
+    """Form used to filter saved network scans."""
+
+    model = NetworkScanRecord
+    dry_run = nullable_boolean_field(label="Dry run")
+    status = forms.ChoiceField(
+        choices=add_blank_choice(NetworkScanStatusChoices),
+        required=False,
+        initial="",
     )
 
 

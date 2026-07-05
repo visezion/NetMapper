@@ -13,6 +13,7 @@ from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.http import HttpResponse
+from django.utils import timezone
 from django.views.generic import FormView
 
 from utilities.forms import BulkDeleteForm, ConfirmationForm
@@ -30,6 +31,15 @@ from netbox.object_actions import (
 from netbox.views import generic
 
 from netmapper import models, tables, forms, filtersets, utils, topologies
+from netmapper.credential_testing import (
+    test_discovery_credential,
+    test_snmp_credential,
+)
+from netmapper.network_discovery import (
+    build_scan_plan,
+    candidate_to_summary,
+    scan_host_candidates,
+)
 
 
 class BulkDiscoverAction(ObjectAction):
@@ -114,6 +124,45 @@ class CredentialView(generic.ObjectView):
         }
 
 
+class CredentialTestView(PermissionRequiredMixin, FormView):
+    """Test a stored discovery credential against a target address."""
+
+    form_class = forms.CredentialConnectionTestForm
+    permission_required = "netmapper.view_credential"
+    template_name = "netmapper/credential_test.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        """Load the credential once for GET/POST handling."""
+        self.credential = models.Credential.objects.get(pk=kwargs["pk"])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        """Expose the credential and optional test result."""
+        context = super().get_context_data(**kwargs)
+        context.update(
+            {
+                "credential": self.credential,
+                "return_url": self.credential.get_absolute_url(),
+            }
+        )
+        return context
+
+    def form_valid(self, form):
+        """Run the discovery credential test and display the result."""
+        try:
+            result = test_discovery_credential(
+                self.credential,
+                address=form.cleaned_data["address"],
+                mode=form.cleaned_data["mode"],
+                timeout=form.cleaned_data["timeout"] or 10,
+            )
+        except Exception as exc:  # pylint: disable=broad-except
+            form.add_error(None, str(exc))
+            return self.form_invalid(form)
+        context = self.get_context_data(form=form, test_result=result)
+        return self.render_to_response(context)
+
+
 class CredentialEditView(generic.ObjectEditView):
     """Edit Credential view."""
 
@@ -169,6 +218,42 @@ class SnmpCredentialView(generic.ObjectView):
     queryset = models.SnmpCredential.objects.all()
 
 
+class SnmpCredentialTestView(PermissionRequiredMixin, FormView):
+    """Test a stored SNMP credential against a target address."""
+
+    form_class = forms.SnmpCredentialConnectionTestForm
+    permission_required = "netmapper.view_snmpcredential"
+    template_name = "netmapper/snmpcredential_test.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        """Load the SNMP credential once for GET/POST handling."""
+        self.snmp_credential = models.SnmpCredential.objects.get(pk=kwargs["pk"])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        """Expose the SNMP credential and optional test result."""
+        context = super().get_context_data(**kwargs)
+        context.update(
+            {
+                "snmp_credential": self.snmp_credential,
+                "return_url": self.snmp_credential.get_absolute_url(),
+            }
+        )
+        return context
+
+    def form_valid(self, form):
+        """Run the SNMP credential test and display the result."""
+        result = test_snmp_credential(
+            self.snmp_credential,
+            address=form.cleaned_data["address"],
+            timeout=form.cleaned_data["timeout"] or 2,
+        )
+        if not result.get("success"):
+            form.add_error(None, result.get("error"))
+        context = self.get_context_data(form=form, test_result=result)
+        return self.render_to_response(context)
+
+
 class SnmpCredentialEditView(generic.ObjectEditView):
     """Edit stored SNMP credential view."""
 
@@ -197,16 +282,20 @@ class NetworkScanView(PermissionRequiredMixin, FormView):
     def get_context_data(self, **kwargs):
         """Add standard template context."""
         context = super().get_context_data(**kwargs)
+        recent_scans = models.NetworkScanRecord.objects.all()[:10]
+        recent_scans_table = tables.NetworkScanRecordTable(recent_scans)
+        recent_scans_table.configure(self.request)
         context.update(
             {
                 "title": "Network Scan",
                 "return_url": reverse("plugins:netmapper:discoverable_list"),
+                "recent_scans_table": recent_scans_table,
             }
         )
         return context
 
-    def form_valid(self, form):
-        """Queue the scan job using the stored SNMP credential, if supplied."""
+    def _build_scan_post_data(self, form):
+        """Create the post_data payload expected by the script job."""
         snmp_credential = form.cleaned_data.get("snmp_credential")
         snmp_community = ""
         snmp_port = 161
@@ -216,7 +305,7 @@ class NetworkScanView(PermissionRequiredMixin, FormView):
             snmp_port = snmp_credential.port
             snmp_version = snmp_credential.version
 
-        post_data = {
+        return {
             "credential": form.cleaned_data["credential"],
             "default_mode": form.cleaned_data["default_mode"],
             "site": form.cleaned_data["site"],
@@ -226,6 +315,7 @@ class NetworkScanView(PermissionRequiredMixin, FormView):
             "snmp_version": snmp_version,
             "discover_now": form.cleaned_data["discover_now"],
             "overwrite_mode": form.cleaned_data["overwrite_mode"],
+            "store_identity_notes": form.cleaned_data["store_identity_notes"],
             "max_hosts": form.cleaned_data["max_hosts"],
             "nmap_host_timeout": form.cleaned_data["nmap_host_timeout"],
             "snmp_timeout": form.cleaned_data["snmp_timeout"],
@@ -233,17 +323,148 @@ class NetworkScanView(PermissionRequiredMixin, FormView):
             "filter_type": form.cleaned_data["filter_type"],
         }
 
+    def _create_scan_record(self, form, plan, dry_run=False):
+        """Persist a network scan history record."""
+        return models.NetworkScanRecord.objects.create(
+            site=form.cleaned_data["site"],
+            credential=form.cleaned_data["credential"],
+            snmp_credential=form.cleaned_data.get("snmp_credential"),
+            default_mode=form.cleaned_data["default_mode"],
+            targets=form.cleaned_data["targets"],
+            normalized_targets=plan.normalized_targets,
+            invalid_targets=plan.invalid_targets,
+            filters=form.cleaned_data["filters"],
+            filter_type=form.cleaned_data["filter_type"],
+            discover_now=form.cleaned_data["discover_now"],
+            overwrite_mode=form.cleaned_data["overwrite_mode"],
+            dry_run=dry_run,
+            store_identity_notes=form.cleaned_data["store_identity_notes"],
+            max_hosts=form.cleaned_data["max_hosts"],
+            nmap_host_timeout=form.cleaned_data["nmap_host_timeout"],
+            snmp_timeout=form.cleaned_data["snmp_timeout"],
+            estimated_host_count=plan.estimated_host_count,
+            status=models.NetworkScanStatusChoices.QUEUED,
+        )
+
+    def _render_preview(self, form, plan, candidates=None, preview_error=None):
+        """Render the page with preview or dry-run results."""
+        preview_summary = None
+        if candidates is not None:
+            preview_summary = {
+                "responsive_hosts_count": len(candidates),
+                "snmp_failures_count": len([candidate for candidate in candidates if candidate.snmp_failed]),
+                "results": [candidate_to_summary(candidate) for candidate in candidates[:25]],
+            }
+        context = self.get_context_data(
+            form=form,
+            preview_plan=plan,
+            preview_summary=preview_summary,
+            preview_error=preview_error,
+        )
+        return self.render_to_response(context)
+
+    def post(self, request, *args, **kwargs):
+        """Support preview, dry-run, and queued execution from one form."""
+        self.object = None
+        form = self.get_form()
+        if not form.is_valid():
+            return self.form_invalid(form)
+
+        plan = build_scan_plan(
+            form.cleaned_data["targets"],
+            form.cleaned_data["max_hosts"],
+        )
+
+        if "_preview" in request.POST:
+            return self._render_preview(form, plan)
+
+        if plan.exceeds_max_hosts:
+            form.add_error(
+                "max_hosts",
+                f"Requested scan covers {plan.estimated_host_count} IPs which exceeds the safety cap of {plan.max_hosts}.",
+            )
+            return self.form_invalid(form)
+
+        if "_dry_run" in request.POST:
+            post_data = self._build_scan_post_data(form)
+            try:
+                candidates = scan_host_candidates(
+                    plan.normalized_targets,
+                    default_mode=post_data["default_mode"],
+                    snmp_community=post_data["snmp_community"],
+                    snmp_port=post_data["snmp_port"],
+                    snmp_version=post_data["snmp_version"],
+                    host_timeout=post_data["nmap_host_timeout"],
+                    snmp_timeout=post_data["snmp_timeout"],
+                )
+            except Exception as exc:  # pylint: disable=broad-except
+                return self._render_preview(form, plan, preview_error=str(exc))
+
+            record = self._create_scan_record(form, plan, dry_run=True)
+            record.status = models.NetworkScanStatusChoices.COMPLETED
+            record.started_at = timezone.now()
+            record.finished_at = timezone.now()
+            record.responsive_hosts_count = len(candidates)
+            record.snmp_failures_count = len([candidate for candidate in candidates if candidate.snmp_failed])
+            record.summary = {
+                "preview_only": True,
+                "responsive_hosts_count": record.responsive_hosts_count,
+                "snmp_failures_count": record.snmp_failures_count,
+            }
+            record.results = [candidate_to_summary(candidate) for candidate in candidates]
+            record.save()
+            messages.success(
+                request,
+                f"Dry run completed successfully ({record.responsive_hosts_count} responsive hosts).",
+            )
+            return self._render_preview(form, plan, candidates=candidates)
+
+        return self.form_valid(form, plan=plan)
+
+    def form_valid(self, form, plan=None):
+        """Queue the scan job using the stored SNMP credential, if supplied."""
+        plan = plan or build_scan_plan(
+            form.cleaned_data["targets"],
+            form.cleaned_data["max_hosts"],
+        )
+        post_data = self._build_scan_post_data(form)
+        record = self._create_scan_record(form, plan, dry_run=False)
+        post_data["scan_record_id"] = record.pk
+
         try:
             job_id = utils.spawn_script("ScanNetwork", user=self.request.user, post_data=post_data)
         except Exception as exc:  # pylint: disable=broad-except
             form.add_error(None, str(exc))
             return self.form_invalid(form)
+        record.job_id = str(job_id)
+        record.save(update_fields=["job_id", "last_updated"])
 
         messages.success(
             self.request,
             f"Network scan queued successfully (job ID {job_id}).",
         )
         return super().form_valid(form)
+
+
+class NetworkScanRecordListView(generic.ObjectListView):
+    """Summary view listing saved network scans."""
+
+    queryset = models.NetworkScanRecord.objects.all()
+    table = tables.NetworkScanRecordTable
+    filterset = filtersets.NetworkScanRecordFilterSet
+    filterset_form = forms.NetworkScanRecordFilterForm
+
+
+class NetworkScanRecordView(generic.ObjectView):
+    """Detailed saved network scan view."""
+
+    queryset = models.NetworkScanRecord.objects.all()
+
+    def get_extra_context(self, request, instance):
+        """Expose summary data to the template."""
+        return {
+            "summary_rows": instance.results[:50],
+        }
 
 
 #

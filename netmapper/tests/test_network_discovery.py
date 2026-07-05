@@ -3,11 +3,16 @@
 from django.test import SimpleTestCase
 
 from netmapper.network_discovery import (
+    build_identity_note,
+    build_scan_plan,
     estimate_target_host_count,
     infer_discovery_mode,
+    merge_identity_note,
     parse_nmap_xml_hosts,
     parse_snmpget_output,
     parse_target_specs,
+    NmapHostResult,
+    SnmpHostMetadata,
 )
 
 
@@ -31,6 +36,17 @@ class NetworkDiscoveryHelperTest(SimpleTestCase):
             ["192.0.2.1", "192.0.2.0/30", "192.0.2.10-192.0.2.12"]
         )
         self.assertEqual(total, 8)
+
+    def test_build_scan_plan(self):
+        """The scan plan should include normalized and invalid target details."""
+        plan = build_scan_plan(
+            "192.0.2.1\n192.0.2.0/30 invalid",
+            max_hosts=3,
+        )
+        self.assertEqual(plan.normalized_targets, ["192.0.2.1", "192.0.2.0/30"])
+        self.assertEqual(plan.invalid_targets, ["invalid"])
+        self.assertEqual(plan.estimated_host_count, 5)
+        self.assertTrue(plan.exceeds_max_hosts)
 
     def test_parse_nmap_xml_hosts(self):
         """Nmap XML should produce responsive host records."""
@@ -80,3 +96,44 @@ class NetworkDiscoveryHelperTest(SimpleTestCase):
             infer_discovery_mode(sys_descr="PAN-OS 11.1.0"),
             "xml_panw_ngfw",
         )
+        self.assertEqual(
+            infer_discovery_mode(
+                sys_descr="Cisco IOS XE Software, Version 17.09.04a",
+                vendor="Cisco",
+            ),
+            "netmiko_cisco_ios",
+        )
+        self.assertEqual(
+            infer_discovery_mode(
+                sys_descr="ArubaOS-CX Virtual.10.13",
+                hostname="leaf-a",
+            ),
+            "netmiko_aruba_aoscx",
+        )
+
+    def test_build_identity_note_and_merge(self):
+        """Identity notes should include observed details and append cleanly."""
+        host = NmapHostResult(
+            address="192.0.2.10",
+            hostname="edge-sw1",
+            mac_address="AA:BB:CC:DD:EE:FF",
+            vendor="Cisco",
+        )
+        snmp = SnmpHostMetadata(
+            address="192.0.2.10",
+            sys_name="edge-sw1",
+            sys_descr="Cisco IOS XE Software",
+            sys_object_id="1.3.6.1.4.1.9.1.1208",
+        )
+        note = build_identity_note(
+            host,
+            snmp_metadata=snmp,
+            selected_mode="netmiko_cisco_ios",
+            inferred_mode="netmiko_cisco_ios",
+        )
+        self.assertIn("Address: 192.0.2.10", note)
+        self.assertIn("Nmap hostname: edge-sw1", note)
+        self.assertIn("SNMP sysName: edge-sw1", note)
+        merged = merge_identity_note("Existing comments", note)
+        self.assertIn("Existing comments", merged)
+        self.assertIn("Network scan identity", merged)

@@ -11,6 +11,7 @@ from netbox.filtersets import NetBoxModelFilterSet
 from netmapper.models import (
     Discoverable,
     Credential,
+    NetworkScanRecord,
     SnmpCredential,
     DiscoveryLog,
     ArpTableEntry,
@@ -70,6 +71,25 @@ class SnmpCredentialFilterSet(NetBoxModelFilterSet):
             Q(name__icontains=value)
             | Q(version__icontains=value)
             | Q(port__icontains=value)
+        )
+
+
+class NetworkScanRecordFilterSet(NetBoxModelFilterSet):
+    """FilterSet used for saved network scans."""
+
+    class Meta:
+        """FilterSet metadata."""
+
+        model = NetworkScanRecord
+        fields = ["site", "status", "dry_run"]
+
+    def search(self, queryset, name, value):
+        """Generic (quick) search."""
+        return queryset.filter(
+            Q(site__name__icontains=value)
+            | Q(targets__icontains=value)
+            | Q(default_mode__icontains=value)
+            | Q(job_id__icontains=value)
         )
 
 

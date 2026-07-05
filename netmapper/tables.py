@@ -96,6 +96,48 @@ class SnmpCredentialTable(NetBoxTable):
         default_columns = ["name", "version", "port", "last_updated"]
 
 
+class NetworkScanRecordTable(NetBoxTable):
+    """History table for subnet/range scans."""
+
+    created = tables.DateTimeColumn(linkify=True)
+    site = tables.Column(linkify=True)
+    status = ChoiceFieldColumn()
+
+    class Meta(NetBoxTable.Meta):
+        """Table metadata."""
+
+        model = models.NetworkScanRecord
+        fields = [
+            "pk",
+            "id",
+            "created",
+            "site",
+            "status",
+            "dry_run",
+            "default_mode",
+            "estimated_host_count",
+            "responsive_hosts_count",
+            "created_count",
+            "updated_count",
+            "reused_count",
+            "job_id",
+            "last_updated",
+        ]
+        default_columns = [
+            "created",
+            "site",
+            "status",
+            "dry_run",
+            "default_mode",
+            "estimated_host_count",
+            "responsive_hosts_count",
+            "created_count",
+            "updated_count",
+            "reused_count",
+            "job_id",
+        ]
+
+
 #
 # Diagram tables
 #
