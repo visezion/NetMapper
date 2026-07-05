@@ -7,6 +7,7 @@ __license__ = "GPLv3"
 
 from datetime import date, timedelta
 import re
+import traceback
 import netaddr
 
 from django.conf import settings
@@ -379,213 +380,238 @@ class ScanNetwork(Script):
 
     def run(self, data, commit):
         """Scan a subnet/range, create discoverables, and optionally discover them."""
-        if not commit:
-            self.log_warning("Commit not set, using dry-run mode")
-
-        credential_o = data.get("credential")
-        site_o = data.get("site")
-        default_mode = data.get("default_mode")
-        overwrite_mode = data.get("overwrite_mode")
-        discover_now = data.get("discover_now")
-        store_identity_notes = data.get("store_identity_notes", True)
-        snmp_community = (data.get("snmp_community") or "").strip()
-        snmp_port = data.get("snmp_port") or 161
-        snmp_version = data.get("snmp_version") or SnmpVersionChoices.V2C
         scan_record = None
-        scan_record_id = data.get("scan_record_id") or 0
-        filters = _normalize_filters(data.get("filters"))
-        filter_type = data.get("filter_type")
-
-        if scan_record_id:
-            scan_record = NetworkScanRecord_m.objects.filter(pk=scan_record_id).first()
-            self._save_scan_record(
-                scan_record,
-                status=NetworkScanStatusChoices.RUNNING,
-                started_at=timezone.now(),
-            )
-
-        plan = build_scan_plan(
-            data.get("targets"),
-            data.get("max_hosts") or SUBNET_SCAN_MAX_HOSTS,
-        )
-        for invalid_target in plan.invalid_targets:
-            self.log_warning(f"Skipping invalid target {invalid_target}")
-
-        if not plan.normalized_targets:
-            self._save_scan_record(
-                scan_record,
-                status=NetworkScanStatusChoices.FAILED,
-                finished_at=timezone.now(),
-                error="No valid targets were supplied",
-                normalized_targets=plan.normalized_targets,
-                invalid_targets=plan.invalid_targets,
-                estimated_host_count=plan.estimated_host_count,
-            )
-            self.log_failure("No valid targets were supplied")
-            return ""
-
-        if plan.exceeds_max_hosts:
-            error = (
-                f"Requested scan covers {plan.estimated_host_count} IPs which exceeds "
-                f"the safety cap of {plan.max_hosts}"
-            )
-            self._save_scan_record(
-                scan_record,
-                status=NetworkScanStatusChoices.FAILED,
-                finished_at=timezone.now(),
-                error=error,
-                normalized_targets=plan.normalized_targets,
-                invalid_targets=plan.invalid_targets,
-                estimated_host_count=plan.estimated_host_count,
-            )
-            self.log_failure(
-                error
-            )
-            return ""
-
-        self.log_info(
-            f"Scanning {len(plan.normalized_targets)} target specs covering approximately "
-            f"{plan.estimated_host_count} IPs"
-        )
-
+        plan = None
         try:
-            candidates = scan_host_candidates(
-                plan.normalized_targets,
-                default_mode=default_mode,
-                snmp_community=snmp_community,
-                snmp_port=snmp_port,
-                snmp_version=snmp_version,
-                host_timeout=data.get("nmap_host_timeout") or NMAP_HOST_TIMEOUT,
-                snmp_timeout=data.get("snmp_timeout") or SNMP_TIMEOUT,
-                nmap_executable=NMAP_EXECUTABLE,
-                snmp_executable=SNMPGET_EXECUTABLE,
-                snmp_fallback_max_hosts=SNMP_FALLBACK_MAX_HOSTS,
-            )
-        except RuntimeError as exc:
-            self._save_scan_record(
-                scan_record,
-                status=NetworkScanStatusChoices.FAILED,
-                finished_at=timezone.now(),
-                error=str(exc),
-                normalized_targets=plan.normalized_targets,
-                invalid_targets=plan.invalid_targets,
-                estimated_host_count=plan.estimated_host_count,
-            )
-            self.log_failure(str(exc))
-            return ""
+            if not commit:
+                self.log_warning("Commit not set, using dry-run mode")
 
-        if not candidates:
-            self._save_scan_record(
-                scan_record,
-                status=NetworkScanStatusChoices.COMPLETED,
-                finished_at=timezone.now(),
-                normalized_targets=plan.normalized_targets,
-                invalid_targets=plan.invalid_targets,
-                estimated_host_count=plan.estimated_host_count,
-                responsive_hosts_count=0,
-                created_count=0,
-                updated_count=0,
-                reused_count=0,
-                snmp_failures_count=0,
-                summary={
-                    "discover_now": discover_now,
-                    "filters": filters,
-                    "filter_type": filter_type,
-                    "responsive_hosts_count": 0,
-                },
-                results=[],
-                error="",
-            )
-            self.log_warning("Nmap did not find any responsive hosts")
-            return ""
+            credential_o = data.get("credential")
+            site_o = data.get("site")
+            default_mode = data.get("default_mode")
+            overwrite_mode = data.get("overwrite_mode")
+            discover_now = data.get("discover_now")
+            store_identity_notes = data.get("store_identity_notes", True)
+            snmp_community = (data.get("snmp_community") or "").strip()
+            snmp_port = data.get("snmp_port") or 161
+            snmp_version = data.get("snmp_version") or SnmpVersionChoices.V2C
+            scan_record_id = data.get("scan_record_id") or 0
+            filters = _normalize_filters(data.get("filters"))
+            filter_type = data.get("filter_type")
 
-        created_count = 0
-        updated_count = 0
-        reused_count = 0
-        snmp_failures_count = 0
-        scan_discoverables = []
-        result_rows = []
-
-        for candidate in candidates:
-            if candidate.snmp_failed:
-                snmp_failures_count += 1
-                self.log_warning(
-                    f"{candidate.host.address}: SNMP identity probe failed "
-                    f"({candidate.snmp_metadata.error})"
+            if scan_record_id:
+                scan_record = NetworkScanRecord_m.objects.filter(pk=scan_record_id).first()
+                self._save_scan_record(
+                    scan_record,
+                    status=NetworkScanStatusChoices.RUNNING,
+                    started_at=timezone.now(),
                 )
 
-            discoverable_o = Discoverable_m.objects.filter(
-                address=candidate.host.address
-            ).first()
-            if discoverable_o:
-                change_list = []
-                if discoverable_o.credential_id != credential_o.pk:
-                    discoverable_o.credential = credential_o
-                    change_list.append("credential")
-                if discoverable_o.site_id != site_o.pk:
-                    discoverable_o.site = site_o
-                    change_list.append("site")
-                if not discoverable_o.discoverable:
-                    discoverable_o.discoverable = True
-                    change_list.append("discoverable")
-                if overwrite_mode and discoverable_o.mode != candidate.selected_mode:
-                    discoverable_o.mode = candidate.selected_mode
-                    change_list.append("mode")
-                if store_identity_notes:
-                    merged_notes = merge_identity_note(
-                        discoverable_o.identity_notes,
-                        candidate.identity_note,
-                    )
-                    if merged_notes != (discoverable_o.identity_notes or ""):
-                        discoverable_o.identity_notes = merged_notes
-                        change_list.append("identity_notes")
+            plan = build_scan_plan(
+                data.get("targets"),
+                data.get("max_hosts") or SUBNET_SCAN_MAX_HOSTS,
+            )
+            for invalid_target in plan.invalid_targets:
+                self.log_warning(f"Skipping invalid target {invalid_target}")
 
-                if change_list:
-                    discoverable_o.save()
-                    updated_count += 1
-                    self.log_info(
-                        f"Updated discoverable {discoverable_o.address} ({', '.join(change_list)})"
+            if not plan.normalized_targets:
+                self._save_scan_record(
+                    scan_record,
+                    status=NetworkScanStatusChoices.FAILED,
+                    finished_at=timezone.now(),
+                    error="No valid targets were supplied",
+                    normalized_targets=plan.normalized_targets,
+                    invalid_targets=plan.invalid_targets,
+                    estimated_host_count=plan.estimated_host_count,
+                )
+                self.log_failure("No valid targets were supplied")
+                return ""
+
+            if plan.exceeds_max_hosts:
+                error = (
+                    f"Requested scan covers {plan.estimated_host_count} IPs which exceeds "
+                    f"the safety cap of {plan.max_hosts}"
+                )
+                self._save_scan_record(
+                    scan_record,
+                    status=NetworkScanStatusChoices.FAILED,
+                    finished_at=timezone.now(),
+                    error=error,
+                    normalized_targets=plan.normalized_targets,
+                    invalid_targets=plan.invalid_targets,
+                    estimated_host_count=plan.estimated_host_count,
+                )
+                self.log_failure(error)
+                return ""
+
+            self.log_info(
+                f"Scanning {len(plan.normalized_targets)} target specs covering approximately "
+                f"{plan.estimated_host_count} IPs"
+            )
+
+            try:
+                candidates = scan_host_candidates(
+                    plan.normalized_targets,
+                    default_mode=default_mode,
+                    snmp_community=snmp_community,
+                    snmp_port=snmp_port,
+                    snmp_version=snmp_version,
+                    host_timeout=data.get("nmap_host_timeout") or NMAP_HOST_TIMEOUT,
+                    snmp_timeout=data.get("snmp_timeout") or SNMP_TIMEOUT,
+                    nmap_executable=NMAP_EXECUTABLE,
+                    snmp_executable=SNMPGET_EXECUTABLE,
+                    snmp_fallback_max_hosts=SNMP_FALLBACK_MAX_HOSTS,
+                )
+            except RuntimeError as exc:
+                self._save_scan_record(
+                    scan_record,
+                    status=NetworkScanStatusChoices.FAILED,
+                    finished_at=timezone.now(),
+                    error=str(exc),
+                    normalized_targets=plan.normalized_targets,
+                    invalid_targets=plan.invalid_targets,
+                    estimated_host_count=plan.estimated_host_count,
+                )
+                self.log_failure(str(exc))
+                return ""
+
+            if not candidates:
+                self._save_scan_record(
+                    scan_record,
+                    status=NetworkScanStatusChoices.COMPLETED,
+                    finished_at=timezone.now(),
+                    normalized_targets=plan.normalized_targets,
+                    invalid_targets=plan.invalid_targets,
+                    estimated_host_count=plan.estimated_host_count,
+                    responsive_hosts_count=0,
+                    created_count=0,
+                    updated_count=0,
+                    reused_count=0,
+                    snmp_failures_count=0,
+                    summary={
+                        "discover_now": discover_now,
+                        "filters": filters,
+                        "filter_type": filter_type,
+                        "responsive_hosts_count": 0,
+                    },
+                    results=[],
+                    error="",
+                )
+                self.log_warning("Nmap did not find any responsive hosts")
+                return ""
+
+            created_count = 0
+            updated_count = 0
+            reused_count = 0
+            snmp_failures_count = 0
+            scan_discoverables = []
+            result_rows = []
+
+            for candidate in candidates:
+                if candidate.snmp_failed:
+                    snmp_failures_count += 1
+                    self.log_warning(
+                        f"{candidate.host.address}: SNMP identity probe failed "
+                        f"({candidate.snmp_metadata.error})"
                     )
+
+                discoverable_o = Discoverable_m.objects.filter(
+                    address=candidate.host.address
+                ).first()
+                if discoverable_o:
+                    change_list = []
+                    if discoverable_o.credential_id != credential_o.pk:
+                        discoverable_o.credential = credential_o
+                        change_list.append("credential")
+                    if discoverable_o.site_id != site_o.pk:
+                        discoverable_o.site = site_o
+                        change_list.append("site")
+                    if not discoverable_o.discoverable:
+                        discoverable_o.discoverable = True
+                        change_list.append("discoverable")
+                    if overwrite_mode and discoverable_o.mode != candidate.selected_mode:
+                        discoverable_o.mode = candidate.selected_mode
+                        change_list.append("mode")
+                    if store_identity_notes:
+                        merged_notes = merge_identity_note(
+                            discoverable_o.identity_notes,
+                            candidate.identity_note,
+                        )
+                        if merged_notes != (discoverable_o.identity_notes or ""):
+                            discoverable_o.identity_notes = merged_notes
+                            change_list.append("identity_notes")
+
+                    if change_list:
+                        discoverable_o.save()
+                        updated_count += 1
+                        self.log_info(
+                            f"Updated discoverable {discoverable_o.address} ({', '.join(change_list)})"
+                        )
+                    else:
+                        reused_count += 1
+                        self.log_info(f"Reusing discoverable {discoverable_o.address}")
                 else:
-                    reused_count += 1
-                    self.log_info(f"Reusing discoverable {discoverable_o.address}")
-            else:
-                discoverable_o, _ = discoverable.get_or_create(
-                    address=candidate.host.address,
-                    site_id=site_o.pk,
-                    mode=candidate.selected_mode,
-                    credential_id=credential_o.pk,
-                    discoverable=True,
-                )
-                if store_identity_notes and candidate.identity_note:
-                    discoverable_o.identity_notes = merge_identity_note(
-                        discoverable_o.identity_notes,
-                        candidate.identity_note,
+                    discoverable_o, _ = discoverable.get_or_create(
+                        address=candidate.host.address,
+                        site_id=site_o.pk,
+                        mode=candidate.selected_mode,
+                        credential_id=credential_o.pk,
+                        discoverable=True,
                     )
-                    discoverable_o.save()
-                created_count += 1
-                self.log_info(
-                    f"Created discoverable {discoverable_o.address} using mode "
-                    f"{candidate.selected_mode}"
+                    if store_identity_notes and candidate.identity_note:
+                        discoverable_o.identity_notes = merge_identity_note(
+                            discoverable_o.identity_notes,
+                            candidate.identity_note,
+                        )
+                        discoverable_o.save()
+                    created_count += 1
+                    self.log_info(
+                        f"Created discoverable {discoverable_o.address} using mode "
+                        f"{candidate.selected_mode}"
+                    )
+
+                scan_discoverables.append(discoverable_o)
+                self._log_candidate_identity(candidate)
+                result_rows.append(candidate_to_summary(candidate))
+
+            self.log_info(
+                f"Scan complete: {created_count} created, {updated_count} updated, {reused_count} reused"
+            )
+
+            summary = {
+                "discover_now": discover_now,
+                "filters": filters,
+                "filter_type": filter_type,
+                "responsive_hosts_count": len(candidates),
+                "snmp_failures_count": snmp_failures_count,
+            }
+
+            if not discover_now:
+                self._save_scan_record(
+                    scan_record,
+                    status=NetworkScanStatusChoices.COMPLETED,
+                    finished_at=timezone.now(),
+                    normalized_targets=plan.normalized_targets,
+                    invalid_targets=plan.invalid_targets,
+                    estimated_host_count=plan.estimated_host_count,
+                    responsive_hosts_count=len(candidates),
+                    created_count=created_count,
+                    updated_count=updated_count,
+                    reused_count=reused_count,
+                    snmp_failures_count=snmp_failures_count,
+                    summary=summary,
+                    results=result_rows,
+                    error="",
                 )
+                return ""
 
-            scan_discoverables.append(discoverable_o)
-            self._log_candidate_identity(candidate)
-            result_rows.append(candidate_to_summary(candidate))
-
-        self.log_info(
-            f"Scan complete: {created_count} created, {updated_count} updated, {reused_count} reused"
-        )
-
-        summary = {
-            "discover_now": discover_now,
-            "filters": filters,
-            "filter_type": filter_type,
-            "responsive_hosts_count": len(candidates),
-            "snmp_failures_count": snmp_failures_count,
-        }
-
-        if not discover_now:
+            output = _spawn_discovery_batch(
+                self,
+                scan_discoverables,
+                filters=filters,
+                filter_type=filter_type,
+            )
+            summary["queued_discovery_count"] = len(scan_discoverables)
             self._save_scan_record(
                 scan_record,
                 status=NetworkScanStatusChoices.COMPLETED,
@@ -602,33 +628,22 @@ class ScanNetwork(Script):
                 results=result_rows,
                 error="",
             )
-            return ""
-
-        output = _spawn_discovery_batch(
-            self,
-            scan_discoverables,
-            filters=filters,
-            filter_type=filter_type,
-        )
-        summary["queued_discovery_count"] = len(scan_discoverables)
-        self._save_scan_record(
-            scan_record,
-            status=NetworkScanStatusChoices.COMPLETED,
-            finished_at=timezone.now(),
-            normalized_targets=plan.normalized_targets,
-            invalid_targets=plan.invalid_targets,
-            estimated_host_count=plan.estimated_host_count,
-            responsive_hosts_count=len(candidates),
-            created_count=created_count,
-            updated_count=updated_count,
-            reused_count=reused_count,
-            snmp_failures_count=snmp_failures_count,
-            summary=summary,
-            results=result_rows,
-            error="",
-        )
-        self.log_info("Queued NetMapper discovery for responsive hosts")
-        return output
+            self.log_info("Queued NetMapper discovery for responsive hosts")
+            return output
+        except Exception as exc:
+            error_message = f"{type(exc).__name__}: {exc}"
+            traceback_text = traceback.format_exc()
+            self._save_scan_record(
+                scan_record,
+                status=NetworkScanStatusChoices.FAILED,
+                finished_at=timezone.now(),
+                error=f"{error_message}\n\n{traceback_text}",
+                normalized_targets=plan.normalized_targets if plan else [],
+                invalid_targets=plan.invalid_targets if plan else [],
+                estimated_host_count=plan.estimated_host_count if plan else 0,
+            )
+            self.log_failure(error_message)
+            raise
 
 
 class Discover(Script):

@@ -42,6 +42,7 @@ from netmapper.network_discovery import (
     candidate_to_summary,
     scan_host_candidates,
 )
+from netmapper.job_tracking import reconcile_scan_record_job
 
 try:
     PLUGIN_SETTINGS = settings.PLUGINS_CONFIG.get("netmapper", {})
@@ -289,7 +290,9 @@ class NetworkScanView(PermissionRequiredMixin, FormView):
     def get_context_data(self, **kwargs):
         """Add standard template context."""
         context = super().get_context_data(**kwargs)
-        recent_scans = models.NetworkScanRecord.objects.all()[:10]
+        recent_scans = list(models.NetworkScanRecord.objects.all()[:10])
+        for scan_record in recent_scans:
+            reconcile_scan_record_job(scan_record)
         recent_scans_table = tables.NetworkScanRecordTable(recent_scans)
         recent_scans_table.configure(self.request)
         context.update(
@@ -472,8 +475,10 @@ class NetworkScanRecordView(generic.ObjectView):
 
     def get_extra_context(self, request, instance):
         """Expose summary data to the template."""
+        job_health = reconcile_scan_record_job(instance)
         return {
             "summary_rows": instance.results[:50],
+            "job_health": job_health,
         }
 
 
