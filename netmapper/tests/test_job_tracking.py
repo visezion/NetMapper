@@ -55,3 +55,15 @@ class ScanJobHealthTest(SimpleTestCase):
 
         self.assertFalse(health.should_mark_failed)
         self.assertIn("actively processing", health.detail_message)
+
+    def test_marks_old_record_without_job_id_as_failed(self):
+        """A long-lived active record without a job ID should be surfaced as failed."""
+        health = evaluate_scan_job_health(
+            record_status=NetworkScanStatusChoices.QUEUED,
+            job_id="",
+            started_at=timezone.now() - timedelta(minutes=5),
+            queue_name="default",
+        )
+
+        self.assertTrue(health.should_mark_failed)
+        self.assertIn("does not have a background job ID", health.error_message)

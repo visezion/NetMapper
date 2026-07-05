@@ -12,7 +12,7 @@ from rq.exceptions import NoSuchJobError
 from rq.job import Job as RQJob
 import django_rq
 
-from netmapper.models import NetworkScanStatusChoices
+from netmapper.models import NetworkScanRecord, NetworkScanStatusChoices
 
 ACTIVE_SCAN_STATUSES = {
     NetworkScanStatusChoices.QUEUED,
@@ -43,6 +43,15 @@ def build_orphaned_job_error(job_id, queue_name):
     )
 
 
+def build_missing_job_id_error():
+    """Return a troubleshooting message for scan records without a queue ID."""
+    return (
+        "This scan record does not have a background job ID. The queue submission "
+        "likely failed or was interrupted before NetBox could save the job reference. "
+        "Re-run the scan."
+    )
+
+
 def evaluate_scan_job_health(
     *,
     record_status,
@@ -61,6 +70,7 @@ def evaluate_scan_job_health(
     queue_status = (queue_status or "").lower() or None
     queue_name = queue_name or "default"
     core_error = (core_error or "").strip()
+    effective_started_at = started_at or now
 
     if record_status not in ACTIVE_SCAN_STATUSES:
         return ScanJobHealth(
@@ -70,6 +80,28 @@ def evaluate_scan_job_health(
             should_mark_failed=False,
             error_message="",
             detail_message="This scan record is already in a terminal state.",
+        )
+
+    if not job_id:
+        stale_cutoff = now - timedelta(seconds=int(stale_after_seconds))
+        if effective_started_at > stale_cutoff:
+            return ScanJobHealth(
+                core_status=core_status,
+                queue_status=queue_status,
+                queue_name=queue_name,
+                should_mark_failed=False,
+                error_message="",
+                detail_message="NetBox has created the scan record, but the background job ID has not been saved yet.",
+            )
+
+        error_message = build_missing_job_id_error()
+        return ScanJobHealth(
+            core_status=core_status,
+            queue_status=queue_status,
+            queue_name=queue_name,
+            should_mark_failed=True,
+            error_message=error_message,
+            detail_message=error_message,
         )
 
     if core_status in FAILED_CORE_JOB_STATUSES:
@@ -159,16 +191,48 @@ def inspect_queue_job(job_id, queue_name):
     return (job.get_status(refresh=False) or "").lower() or None
 
 
+def link_scan_record_job_id(scan_record, match_window_seconds=30):
+    """Backfill a missing job UUID from the nearest unmatched NetBox core job."""
+    if scan_record.job_id:
+        return None
+
+    window = timedelta(seconds=int(match_window_seconds))
+    linked_job_ids = list(
+        NetworkScanRecord.objects.exclude(pk=scan_record.pk)
+        .exclude(job_id="")
+        .values_list("job_id", flat=True)
+    )
+    candidates = list(
+        CoreJob.objects.filter(
+            name="Run Script",
+            created__gte=scan_record.created - window,
+            created__lte=scan_record.created + window,
+        ).exclude(job_id__in=linked_job_ids)
+    )
+    if not candidates:
+        return None
+
+    candidates.sort(key=lambda job: abs((job.created - scan_record.created).total_seconds()))
+    core_job = candidates[0]
+    scan_record.job_id = str(core_job.job_id)
+    update_fields = ["job_id", "last_updated"]
+    if scan_record.started_at is None and core_job.started:
+        scan_record.started_at = core_job.started
+        update_fields.append("started_at")
+    scan_record.save(update_fields=update_fields)
+    return core_job
+
+
 def reconcile_scan_record_job(scan_record, stale_after_seconds=60):
     """Synchronize a scan record with NetBox core job and RQ state."""
     queue_name = "default"
-    core_job = None
+    core_job = link_scan_record_job_id(scan_record)
     core_status = None
     core_error = ""
     queue_status = None
 
     if scan_record.job_id:
-        core_job = CoreJob.objects.filter(job_id=scan_record.job_id).first()
+        core_job = core_job or CoreJob.objects.filter(job_id=scan_record.job_id).first()
         if core_job:
             queue_name = core_job.queue_name or queue_name
             core_status = core_job.status
@@ -178,7 +242,7 @@ def reconcile_scan_record_job(scan_record, stale_after_seconds=60):
     health = evaluate_scan_job_health(
         record_status=scan_record.status,
         job_id=scan_record.job_id,
-        started_at=scan_record.started_at,
+        started_at=scan_record.started_at or scan_record.created,
         core_status=core_status,
         core_error=core_error,
         queue_status=queue_status,
