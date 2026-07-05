@@ -6,7 +6,7 @@ import taggit.managers
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("dcim", "0198_devicetype_exclude_from_utilization"),
+        ("dcim", "0237_module_remove_local_context_data"),
         ("netmapper", "0013_snmpcredential"),
     ]
 
