@@ -172,6 +172,23 @@ Key paths:
 - `snmpget`
 - `ntc-templates`
 
+### netbox-docker Prerequisites
+
+For a fresh Ubuntu server using the Docker deployment path, install:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y git docker.io docker-compose-v2
+sudo systemctl enable --now docker
+sudo usermod -aG docker "$USER"
+newgrp docker
+```
+
+Notes:
+
+- run `newgrp docker` or start a new shell session before using `docker compose`
+- if your distribution uses different package names, install Docker Engine plus the Docker Compose v2 plugin
+
 ### Python Requirements
 
 Installed by `setup.py`:
@@ -193,7 +210,8 @@ This is the easiest supported deployment path.
 ### 1. Clone the repositories side by side
 
 ```bash
-cd /opt
+mkdir -p ~/netbox-lab
+cd ~/netbox-lab
 git clone https://github.com/netbox-community/netbox-docker.git
 git clone https://github.com/visezion/NetMapper.git
 ```
@@ -201,14 +219,14 @@ git clone https://github.com/visezion/NetMapper.git
 Expected layout:
 
 ```text
-/opt/netbox-docker
-/opt/NetMapper
+~/netbox-lab/netbox-docker
+~/netbox-lab/NetMapper
 ```
 
 ### 2. Deploy NetBox with NetMapper
 
 ```bash
-cd /opt/NetMapper
+cd ~/netbox-lab/NetMapper
 ./scripts/deploy_netbox_docker.sh main
 ```
 
