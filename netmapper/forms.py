@@ -407,7 +407,7 @@ class NetworkScanRecordFilterForm(NetBoxModelFilterSetForm):
     model = NetworkScanRecord
     dry_run = nullable_boolean_field(label="Dry run")
     status = forms.ChoiceField(
-        choices=add_blank_choice(NetworkScanStatusChoices),
+        choices=add_blank_choice(NetworkScanStatusChoices.choices),
         required=False,
         initial="",
     )
