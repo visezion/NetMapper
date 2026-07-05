@@ -340,7 +340,7 @@ class NetworkScanForm(forms.Form):
     store_identity_notes = forms.BooleanField(
         required=False,
         initial=True,
-        help_text="Store Nmap/SNMP identity details in the discoverable comments field.",
+        help_text="Store Nmap/SNMP identity details in the discoverable identity notes field.",
     )
     max_hosts = forms.IntegerField(
         required=False,

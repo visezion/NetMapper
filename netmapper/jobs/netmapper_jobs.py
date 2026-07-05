@@ -530,13 +530,13 @@ class ScanNetwork(Script):
                     discoverable_o.mode = candidate.selected_mode
                     change_list.append("mode")
                 if store_identity_notes:
-                    merged_comments = merge_identity_note(
-                        discoverable_o.comments,
+                    merged_notes = merge_identity_note(
+                        discoverable_o.identity_notes,
                         candidate.identity_note,
                     )
-                    if merged_comments != (discoverable_o.comments or ""):
-                        discoverable_o.comments = merged_comments
-                        change_list.append("comments")
+                    if merged_notes != (discoverable_o.identity_notes or ""):
+                        discoverable_o.identity_notes = merged_notes
+                        change_list.append("identity_notes")
 
                 if change_list:
                     discoverable_o.save()
@@ -556,8 +556,8 @@ class ScanNetwork(Script):
                     discoverable=True,
                 )
                 if store_identity_notes and candidate.identity_note:
-                    discoverable_o.comments = merge_identity_note(
-                        discoverable_o.comments,
+                    discoverable_o.identity_notes = merge_identity_note(
+                        discoverable_o.identity_notes,
                         candidate.identity_note,
                     )
                     discoverable_o.save()

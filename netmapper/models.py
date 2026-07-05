@@ -407,6 +407,10 @@ class Discoverable(NetBoxModel):
     """Model for Discoverable."""
 
     address = models.GenericIPAddressField()
+    identity_notes = models.TextField(
+        blank=True,
+        help_text="Stored Nmap/SNMP identity observations from network scans.",
+    )
     device = models.OneToOneField(
         to="dcim.Device",
         editable=False,

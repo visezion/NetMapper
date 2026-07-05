@@ -58,6 +58,16 @@ __license__ = "GPLv3"
                             <th scope="row">Total logs</th>
                             <td>{{ object.discoverylogs_count }}</td>
                         </tr>
+                        <tr>
+                            <th scope="row">Identity notes</th>
+                            <td>
+                                {% if object.identity_notes %}
+                                    <pre class="mb-0">{{ object.identity_notes }}</pre>
+                                {% else %}
+                                    <span class="text-muted">None</span>
+                                {% endif %}
+                            </td>
+                        </tr>
                     </table>
                 </div>
             </div>
