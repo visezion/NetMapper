@@ -27,6 +27,7 @@ from extras.scripts import (
 from netmapper.models import (
     Discoverable as Discoverable_m,
     Credential as Credential_m,
+    SnmpVersionChoices,
     DiscoveryLog as DiscoveryLog_m,
     ArpTableEntry as ArpTableEntry_m,
     MacAddressTableEntry as MacAddressTableEntry_m,
@@ -291,6 +292,17 @@ class ScanNetwork(Script):
         description="Optional SNMP v2c community used to infer platform identity.",
         required=False,
     )
+    snmp_port = IntegerVar(
+        description="SNMP UDP port used for identity probes.",
+        required=False,
+        default=161,
+    )
+    snmp_version = ChoiceVar(
+        choices=SnmpVersionChoices.choices,
+        description="SNMP protocol version used for identity probes.",
+        required=True,
+        default=SnmpVersionChoices.V2C,
+    )
     discover_now = BooleanVar(
         description="Queue the normal NetMapper discovery workflow after seeding hosts.",
         required=False,
@@ -338,6 +350,8 @@ class ScanNetwork(Script):
         overwrite_mode = data.get("overwrite_mode")
         discover_now = data.get("discover_now")
         snmp_community = (data.get("snmp_community") or "").strip()
+        snmp_port = data.get("snmp_port") or 161
+        snmp_version = data.get("snmp_version") or SnmpVersionChoices.V2C
         filters = _normalize_filters(data.get("filters"))
         filter_type = data.get("filter_type")
 
@@ -390,6 +404,8 @@ class ScanNetwork(Script):
                     snmp_details = run_snmp_identity_probe(
                         address=host.address,
                         community=snmp_community,
+                        port=snmp_port,
+                        version=snmp_version,
                         timeout=data.get("snmp_timeout") or SNMP_TIMEOUT,
                         executable=SNMPGET_EXECUTABLE,
                     )

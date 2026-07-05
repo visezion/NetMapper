@@ -83,6 +83,19 @@ class CredentialTable(NetBoxTable):
         default_columns = ["name", "username", "verify_cert", "discoverables_count"]
 
 
+class SnmpCredentialTable(NetBoxTable):
+    """Stored SNMP credential list table."""
+
+    name = tables.Column(linkify=True)
+
+    class Meta(NetBoxTable.Meta):
+        """Table metadata."""
+
+        model = models.SnmpCredential
+        fields = ["pk", "id", "name", "version", "port", "last_updated", "created"]
+        default_columns = ["name", "version", "port", "last_updated"]
+
+
 #
 # Diagram tables
 #

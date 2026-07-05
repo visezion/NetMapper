@@ -19,6 +19,22 @@ credential_buttons = [
     ),
 ]
 
+snmpcredential_buttons = [
+    PluginMenuButton(
+        link="plugins:netmapper:snmpcredential_add",
+        title="Add",
+        icon_class="mdi mdi-plus-thick",
+    ),
+]
+
+network_scan_buttons = [
+    PluginMenuButton(
+        link="plugins:netmapper:network_scan",
+        title="Run",
+        icon_class="mdi mdi-radar",
+    ),
+]
+
 diagram_buttons = [
     PluginMenuButton(
         link="plugins:netmapper:diagram_add",
@@ -46,6 +62,18 @@ menu_discovery = (
         link_text="Credentials",
         buttons=credential_buttons,
         permissions=["netmapper.view_credential"],
+    ),
+    PluginMenuItem(
+        link="plugins:netmapper:snmpcredential_list",
+        link_text="SNMP Credentials",
+        buttons=snmpcredential_buttons,
+        permissions=["netmapper.view_snmpcredential"],
+    ),
+    PluginMenuItem(
+        link="plugins:netmapper:network_scan",
+        link_text="Network Scan",
+        buttons=network_scan_buttons,
+        permissions=["netmapper.change_discoverable"],
     ),
     PluginMenuItem(
         link="plugins:netmapper:discoverable_list",

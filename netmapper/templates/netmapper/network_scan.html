@@ -1,0 +1,32 @@
+{% extends "base/layout.html" %}
+{% load form_helpers %}
+{% comment %}
+__author__ = "Andrea Dainese"
+__contact__ = "andrea@adainese.it"
+__copyright__ = "Copyright 2022, Andrea Dainese"
+__license__ = "GPLv3"
+{% endcomment %}
+{% block title %}Network Scan{% endblock %}
+{% block content %}
+    <div class="row">
+        <div class="col col-md-8 offset-md-2">
+            <form method="post">
+                {% csrf_token %}
+                <div class="card">
+                    <h5 class="card-header">Network Scan</h5>
+                    <div class="card-body">
+                        <p class="text-muted">
+                            Scan IPs, CIDRs, or explicit ranges with Nmap, optionally enrich responsive hosts
+                            with a stored SNMP credential, and create or update NetMapper discoverables.
+                        </p>
+                        {% render_form form %}
+                    </div>
+                    <div class="card-footer text-end">
+                        <a href="{{ return_url }}" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">Start Scan</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock content %}

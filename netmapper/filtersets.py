@@ -11,6 +11,7 @@ from netbox.filtersets import NetBoxModelFilterSet
 from netmapper.models import (
     Discoverable,
     Credential,
+    SnmpCredential,
     DiscoveryLog,
     ArpTableEntry,
     MacAddressTableEntry,
@@ -52,6 +53,24 @@ class CredentialFilterSet(NetBoxModelFilterSet):
     def search(self, queryset, name, value):
         """Generic (quick) search."""
         return queryset.filter(Q(name__icontains=value) | Q(username__icontains=value))
+
+
+class SnmpCredentialFilterSet(NetBoxModelFilterSet):
+    """FilterSet used for stored SNMP credentials."""
+
+    class Meta:
+        """FilterSet metadata."""
+
+        model = SnmpCredential
+        fields = ["version", "port"]
+
+    def search(self, queryset, name, value):
+        """Generic (quick) search."""
+        return queryset.filter(
+            Q(name__icontains=value)
+            | Q(version__icontains=value)
+            | Q(port__icontains=value)
+        )
 
 
 class DiscoverableFilterSet(NetBoxModelFilterSet):

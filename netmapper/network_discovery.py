@@ -205,14 +205,22 @@ def parse_snmpget_output(address, output):
 def run_snmp_identity_probe(
     address,
     community,
+    port=161,
+    version="v2c",
     timeout=2,
     retries=0,
     executable="snmpget",
 ):
     """Query basic SNMP identity fields for a host."""
+    target = address
+    if port and int(port) != 161:
+        if ":" in address and not address.startswith("["):
+            target = f"udp6:[{address}]:{int(port)}"
+        else:
+            target = f"udp:{address}:{int(port)}"
     command = [
         executable,
-        "-v2c",
+        f"-{version}",
         "-c",
         community,
         "-t",
@@ -220,7 +228,7 @@ def run_snmp_identity_probe(
         "-r",
         str(retries),
         "-Oqv",
-        address,
+        target,
         "1.3.6.1.2.1.1.5.0",  # sysName.0
         "1.3.6.1.2.1.1.1.0",  # sysDescr.0
         "1.3.6.1.2.1.1.2.0",  # sysObjectID.0

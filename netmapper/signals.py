@@ -37,6 +37,23 @@ def credential_encrypt(instance, **kwargs):  # pylint: disable=unused-argument
         setattr(instance, field, encrypted_value.decode())
 
 
+@receiver(pre_save, sender=models.SnmpCredential)
+def snmpcredential_encrypt(instance, **kwargs):  # pylint: disable=unused-argument
+    """Encrypt SNMP communities before saving."""
+    fernet_o = Fernet(FERNET_KEY)
+    for field in models.SNMP_CREDENTIAL_ENCRYPTED_FIELDS:
+        original_value = getattr(instance, field)
+        if not original_value:
+            continue
+        try:
+            fernet_o.decrypt(original_value.encode())
+            continue
+        except InvalidToken:
+            pass
+        encrypted_value = fernet_o.encrypt(original_value.encode())
+        setattr(instance, field, encrypted_value.decode())
+
+
 @receiver(pre_save, sender=models.Discoverable)
 def meta_device_check(instance, **kwards):  # pylint: disable=unused-argument
     """Raise an exception if both VM and Device are set."""

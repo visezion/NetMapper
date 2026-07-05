@@ -5,6 +5,8 @@ __copyright__ = "Copyright 2022, Andrea Dainese"
 __license__ = "GPLv3"
 
 from django import forms
+from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 
 from dcim.models import Site, DeviceRole, Device
 from ipam.models import VRF
@@ -34,7 +36,14 @@ from netmapper.models import (
     DiscoveryLog,
     DiscoveryModeChoices,
     DiagramModeChoices,
+    SnmpCredential,
 )
+from netmapper.dictionaries import FilterModeChoices
+
+try:
+    PLUGIN_SETTINGS = settings.PLUGINS_CONFIG.get("netmapper", {})
+except ImproperlyConfigured:
+    PLUGIN_SETTINGS = {}
 
 
 def _coerce_nullable_boolean(value):
@@ -107,6 +116,21 @@ class CredentialBulkEditForm(NetBoxModelBulkEditForm):
 
     model = Credential
     nullable_fields = ["username", "password", "enable_password", "verify_cert"]
+
+
+class SnmpCredentialForm(NetBoxModelForm):
+    """Form used to add/edit stored SNMP credentials."""
+
+    class Meta:
+        """Form metadata."""
+
+        model = SnmpCredential
+        fields = ["name", "version", "community", "port", "tags"]
+        widgets = {
+            "community": forms.PasswordInput(
+                render_value=True, attrs={"data-toggle": "password"}
+            ),
+        }
 
 
 #
@@ -270,6 +294,74 @@ class DiscoverableListFilterForm(NetBoxModelFilterSetForm):
         choices=DiscoveryModeChoices,
         required=False,
         help_text="Discovery mode",
+    )
+
+
+class NetworkScanForm(forms.Form):
+    """Dedicated form for launching subnet/range scans from the plugin UI."""
+
+    credential = forms.ModelChoiceField(
+        queryset=Credential.objects.all(),
+        required=True,
+        help_text="Credential attached to created discoverables.",
+    )
+    snmp_credential = forms.ModelChoiceField(
+        queryset=SnmpCredential.objects.all(),
+        required=False,
+        help_text="Optional stored SNMP credential used for platform inference.",
+    )
+    default_mode = forms.ChoiceField(
+        choices=DiscoveryModeChoices,
+        required=True,
+        help_text="Fallback discovery mode when SNMP cannot identify a platform.",
+    )
+    site = forms.ModelChoiceField(
+        queryset=Site.objects.all(),
+        required=True,
+        help_text="Site assigned to discovered IPs.",
+    )
+    targets = forms.CharField(
+        required=True,
+        widget=forms.Textarea(attrs={"rows": 5}),
+        help_text="IPs, CIDRs, or full IP ranges separated by comma, space, or newline.",
+    )
+    discover_now = forms.BooleanField(
+        required=False,
+        initial=True,
+        help_text="Immediately queue the normal NetMapper discovery workflow.",
+    )
+    overwrite_mode = forms.BooleanField(
+        required=False,
+        initial=False,
+        help_text="Allow the inferred or fallback mode to overwrite existing discoverables.",
+    )
+    max_hosts = forms.IntegerField(
+        required=False,
+        initial=PLUGIN_SETTINGS.get("SUBNET_SCAN_MAX_HOSTS", 4096),
+        min_value=1,
+        help_text="Safety cap for the total number of IPs covered by the request.",
+    )
+    nmap_host_timeout = forms.IntegerField(
+        required=False,
+        initial=PLUGIN_SETTINGS.get("NMAP_HOST_TIMEOUT", 30),
+        min_value=1,
+        help_text="Per-host Nmap timeout in seconds.",
+    )
+    snmp_timeout = forms.IntegerField(
+        required=False,
+        initial=PLUGIN_SETTINGS.get("SNMP_TIMEOUT", 2),
+        min_value=1,
+        help_text="SNMP timeout in seconds per responsive host.",
+    )
+    filters = forms.CharField(
+        required=False,
+        help_text="Optional command filter words separated by comma (for queued discovery).",
+    )
+    filter_type = forms.ChoiceField(
+        choices=FilterModeChoices.CHOICES,
+        required=True,
+        initial="exclude",
+        help_text="How the optional command filters should be interpreted.",
     )
 
 

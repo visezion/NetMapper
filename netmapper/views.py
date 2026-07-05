@@ -7,11 +7,13 @@ __license__ = "GPLv3"
 import logging
 import json
 
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import Count
 from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.http import HttpResponse
+from django.views.generic import FormView
 
 from utilities.forms import BulkDeleteForm, ConfirmationForm
 from utilities.htmx import htmx_partial
@@ -150,6 +152,98 @@ class CredentialBulkDeleteView(generic.BulkDeleteView):
     table = tables.CredentialTable
     default_return_url = "plugins:netmapper:credential_list"
     filterset = filtersets.CredentialFilterSet
+
+
+class SnmpCredentialListView(generic.ObjectListView):
+    """Summary view listing stored SNMP credentials."""
+
+    queryset = models.SnmpCredential.objects.all().order_by("name")
+    table = tables.SnmpCredentialTable
+    filterset = filtersets.SnmpCredentialFilterSet
+    actions = (AddObject,)
+
+
+class SnmpCredentialView(generic.ObjectView):
+    """Detailed stored SNMP credential view."""
+
+    queryset = models.SnmpCredential.objects.all()
+
+
+class SnmpCredentialEditView(generic.ObjectEditView):
+    """Edit stored SNMP credential view."""
+
+    queryset = models.SnmpCredential.objects.all()
+    form = forms.SnmpCredentialForm
+
+
+class SnmpCredentialDeleteView(generic.ObjectDeleteView):
+    """Delete stored SNMP credential view."""
+
+    queryset = models.SnmpCredential.objects.all()
+    default_return_url = "plugins:netmapper:snmpcredential_list"
+
+
+class NetworkScanView(PermissionRequiredMixin, FormView):
+    """Dedicated UI for subnet/range scans using stored SNMP credentials."""
+
+    form_class = forms.NetworkScanForm
+    permission_required = "netmapper.change_discoverable"
+    template_name = "netmapper/network_scan.html"
+
+    def get_success_url(self):
+        """Redirect back to the scan page after submitting a job."""
+        return reverse("plugins:netmapper:network_scan")
+
+    def get_context_data(self, **kwargs):
+        """Add standard template context."""
+        context = super().get_context_data(**kwargs)
+        context.update(
+            {
+                "title": "Network Scan",
+                "return_url": reverse("plugins:netmapper:discoverable_list"),
+            }
+        )
+        return context
+
+    def form_valid(self, form):
+        """Queue the scan job using the stored SNMP credential, if supplied."""
+        snmp_credential = form.cleaned_data.get("snmp_credential")
+        snmp_community = ""
+        snmp_port = 161
+        snmp_version = models.SnmpVersionChoices.V2C
+        if snmp_credential:
+            snmp_community = snmp_credential.get_secrets().get("community") or ""
+            snmp_port = snmp_credential.port
+            snmp_version = snmp_credential.version
+
+        post_data = {
+            "credential": form.cleaned_data["credential"],
+            "default_mode": form.cleaned_data["default_mode"],
+            "site": form.cleaned_data["site"],
+            "targets": form.cleaned_data["targets"],
+            "snmp_community": snmp_community,
+            "snmp_port": snmp_port,
+            "snmp_version": snmp_version,
+            "discover_now": form.cleaned_data["discover_now"],
+            "overwrite_mode": form.cleaned_data["overwrite_mode"],
+            "max_hosts": form.cleaned_data["max_hosts"],
+            "nmap_host_timeout": form.cleaned_data["nmap_host_timeout"],
+            "snmp_timeout": form.cleaned_data["snmp_timeout"],
+            "filters": form.cleaned_data["filters"],
+            "filter_type": form.cleaned_data["filter_type"],
+        }
+
+        try:
+            job_id = utils.spawn_script("ScanNetwork", user=self.request.user, post_data=post_data)
+        except Exception as exc:  # pylint: disable=broad-except
+            form.add_error(None, str(exc))
+            return self.form_invalid(form)
+
+        messages.success(
+            self.request,
+            f"Network scan queued successfully (job ID {job_id}).",
+        )
+        return super().form_valid(form)
 
 
 #

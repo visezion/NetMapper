@@ -24,6 +24,12 @@ CREDENTIAL_ENCRYPTED_FIELDS = [
 ]
 
 
+SNMP_CREDENTIAL_ENCRYPTED_FIELDS = [
+    # Fields encrypted in SnmpCredential
+    "community",
+]
+
+
 DRAWIO_ROLE_MAP = {
     # Stencil attributes used when exporting diagrams in Draw.io format
     "access-switch": {

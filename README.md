@@ -95,6 +95,11 @@ Use the `Scan subnet or range` script job to:
 - infer a best-fit discovery mode when possible
 - create or update `Discoverable` records and optionally queue the normal discovery workflow
 
+The plugin now also includes:
+
+- stored `SNMP Credentials` inside the NetMapper UI
+- a dedicated `Network Scan` page for entering subnet/range targets without opening the generic NetBox Scripts UI
+
 ## Planned work
 
 - streamlined fresh-server install documentation

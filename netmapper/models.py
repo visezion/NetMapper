@@ -33,6 +33,7 @@ from netmapper.utils import (
 from netmapper.dictionaries import (
     CONFIG_COMMANDS,
     CREDENTIAL_ENCRYPTED_FIELDS,
+    SNMP_CREDENTIAL_ENCRYPTED_FIELDS,
     FAILURE_OUTPUT,
     DiagramModeChoices,
     DiscoveryModeChoices,
@@ -198,6 +199,59 @@ class Credential(NetBoxModel):
             original_secret = getattr(self, field)
             if original_secret:
                 # Check if already decrypted
+                try:
+                    secret = fernet_o.decrypt(
+                        original_secret.encode()  # pylint: disable=no-member
+                    ).decode()
+                except InvalidToken:
+                    secret = original_secret
+            else:
+                secret = None
+            secrets[field] = secret
+        return secrets
+
+
+class SnmpVersionChoices(models.TextChoices):
+    """Supported SNMP protocol versions for lightweight scan enrichment."""
+
+    V2C = "v2c", "SNMP v2c"
+
+
+class SnmpCredential(NetBoxModel):
+    """Model for stored SNMP credentials used by network scans."""
+
+    name = models.CharField(max_length=100)
+    version = models.CharField(
+        max_length=10,
+        choices=SnmpVersionChoices.choices,
+        default=SnmpVersionChoices.V2C,
+    )
+    community = models.TextField(blank=True)
+    port = models.PositiveIntegerField(default=161)
+
+    class Meta:
+        """Database metadata."""
+
+        ordering = ["name"]
+        unique_together = ["name"]
+        verbose_name = "SNMP credential"
+        verbose_name_plural = "SNMP credentials"
+
+    def __str__(self):
+        """Return a human readable name when the object is printed."""
+        return str(self.name)
+
+    def get_absolute_url(self):
+        """Return the absolute url."""
+        return reverse("plugins:netmapper:snmpcredential", args=[self.pk])
+
+    def get_secrets(self):
+        """Get clear text SNMP secrets."""
+        fernet_o = Fernet(FERNET_KEY)
+        secrets = {}
+        for field in SNMP_CREDENTIAL_ENCRYPTED_FIELDS:
+            original_secret = getattr(self, field)
+            if original_secret:
                 try:
                     secret = fernet_o.decrypt(
                         original_secret.encode()  # pylint: disable=no-member

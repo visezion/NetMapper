@@ -54,6 +54,45 @@ urlpatterns = (
         kwargs={"model": models.Credential},
     ),
     #
+    # SNMP credential urls
+    #
+    path(
+        "snmp-credential/",
+        views.SnmpCredentialListView.as_view(),
+        name="snmpcredential_list",
+    ),
+    path(
+        "snmp-credential/add/",
+        views.SnmpCredentialEditView.as_view(),
+        name="snmpcredential_add",
+    ),
+    path(
+        "snmp-credential/<int:pk>/",
+        views.SnmpCredentialView.as_view(),
+        name="snmpcredential",
+    ),
+    path(
+        "snmp-credential/<int:pk>/edit/",
+        views.SnmpCredentialEditView.as_view(),
+        name="snmpcredential_edit",
+    ),
+    path(
+        "snmp-credential/<int:pk>/delete/",
+        views.SnmpCredentialDeleteView.as_view(),
+        name="snmpcredential_delete",
+    ),
+    path(
+        "snmp-credential/<int:pk>/changelog/",
+        ObjectChangeLogView.as_view(),
+        name="snmpcredential_changelog",
+        kwargs={"model": models.SnmpCredential},
+    ),
+    path(
+        "scan/",
+        views.NetworkScanView.as_view(),
+        name="network_scan",
+    ),
+    #
     # Diagram urls
     #
     path("diagram/", views.DiagramListView.as_view(), name="diagram_list"),
