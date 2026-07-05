@@ -26,11 +26,16 @@ class NetworkDiscoveryHelperTest(SimpleTestCase):
     def test_parse_target_specs(self):
         """CIDRs, addresses, and ranges should normalize cleanly."""
         valid_targets, invalid_targets = parse_target_specs(
-            "192.0.2.1 192.0.2.0/30 192.0.2.10-192.0.2.12 invalid"
+            "192.0.2.1 192.0.2.0/30 192.0.2.10-192.0.2.12 192.0.2.20-22 invalid"
         )
         self.assertEqual(
             valid_targets,
-            ["192.0.2.1", "192.0.2.0/30", "192.0.2.10-192.0.2.12"],
+            [
+                "192.0.2.1",
+                "192.0.2.0/30",
+                "192.0.2.10-192.0.2.12",
+                "192.0.2.20-192.0.2.22",
+            ],
         )
         self.assertEqual(invalid_targets, ["invalid"])
 
@@ -55,7 +60,7 @@ class NetworkDiscoveryHelperTest(SimpleTestCase):
     def test_expand_target_spec_addresses(self):
         """Target expansion should preserve host addresses in order."""
         addresses = expand_target_spec_addresses(
-            ["192.0.2.1", "192.0.2.10-192.0.2.12", "192.0.2.4/31"]
+            ["192.0.2.1", "192.0.2.10-192.0.2.12", "192.0.2.20-22", "192.0.2.4/31"]
         )
         self.assertEqual(
             addresses,
@@ -64,6 +69,9 @@ class NetworkDiscoveryHelperTest(SimpleTestCase):
                 "192.0.2.10",
                 "192.0.2.11",
                 "192.0.2.12",
+                "192.0.2.20",
+                "192.0.2.21",
+                "192.0.2.22",
                 "192.0.2.4",
                 "192.0.2.5",
             ],
@@ -222,7 +230,7 @@ class NetworkDiscoveryHelperTest(SimpleTestCase):
         mock_snmp_probe.side_effect = snmp_side_effect
 
         candidates = scan_host_candidates(
-            ["192.0.2.10-192.0.2.15"],
+            ["192.0.2.10-15"],
             default_mode="linux",
             snmp_community="public",
             host_timeout=10,

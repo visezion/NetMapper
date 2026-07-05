@@ -90,10 +90,28 @@ def split_target_input(raw_targets):
     return [token.strip() for token in TARGET_SPLIT_RE.split(raw_targets) if token.strip()]
 
 
+def _normalize_range_endpoint(start, end):
+    """Expand shorthand IPv4 range endpoints such as 192.0.2.10-15."""
+    if "." in end or ":" in end:
+        return end
+
+    start_ip = ipaddress.ip_address(start)
+    if start_ip.version != 4 or not end.isdigit():
+        return end
+
+    end_octet = int(end)
+    if not 0 <= end_octet <= 255:
+        raise ValueError(f"IP range {start}-{end} has invalid IPv4 end octet")
+
+    start_octets = start_ip.compressed.split(".")
+    return ".".join([*start_octets[:3], str(end_octet)])
+
+
 def normalize_target_spec(target):
     """Validate and normalize an IP/CIDR/range target."""
     if "-" in target and "/" not in target:
         start, end = [item.strip() for item in target.split("-", maxsplit=1)]
+        end = _normalize_range_endpoint(start, end)
         start_ip = ipaddress.ip_address(start)
         end_ip = ipaddress.ip_address(end)
         if start_ip.version != end_ip.version:
@@ -153,6 +171,7 @@ def expand_target_spec_addresses(target_specs: Iterable[str]) -> list[str]:
     """Expand target specs into individual host addresses."""
     expanded = []
     for target in target_specs:
+        target = normalize_target_spec(str(target).strip())
         if "-" in target and "/" not in target:
             start, end = target.split("-", maxsplit=1)
             start_ip = ipaddress.ip_address(start)
@@ -458,8 +477,15 @@ def scan_host_candidates(
     snmp_fallback_max_hosts=256,
 ):
     """Run the scan and return enriched host candidates without persisting them."""
+    normalized_targets = list(
+        dict.fromkeys(
+            normalize_target_spec(str(target).strip())
+            for target in target_specs
+            if str(target).strip()
+        )
+    )
     hosts = run_nmap_ping_scan(
-        target_specs,
+        normalized_targets,
         host_timeout=host_timeout,
         executable=nmap_executable,
     )
@@ -467,7 +493,7 @@ def scan_host_candidates(
     snmp_metadata_by_address = {}
 
     if snmp_community:
-        target_addresses = expand_target_spec_addresses(target_specs)
+        target_addresses = expand_target_spec_addresses(normalized_targets)
         if len(target_addresses) <= int(snmp_fallback_max_hosts):
             for address in target_addresses:
                 if address in hosts_by_address:
