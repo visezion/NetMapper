@@ -102,6 +102,7 @@ class NetworkScanRecordTable(NetBoxTable):
     created = tables.DateTimeColumn(linkify=True)
     site = tables.Column(linkify=True)
     status = ChoiceFieldColumn()
+    actions = []  # Read-only history records
 
     class Meta(NetBoxTable.Meta):
         """Table metadata."""
