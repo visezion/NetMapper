@@ -171,6 +171,11 @@ urlpatterns = (
         name="discoverable_bulk_discover",
     ),
     path(
+        "discoverable/ingest/",
+        views.DiscoverableBulkIngestView.as_view(),
+        name="discoverable_bulk_ingest",
+    ),
+    path(
         "discoverable/<int:pk>/", views.DiscoverableView.as_view(), name="discoverable"
     ),
     path(
@@ -187,6 +192,11 @@ urlpatterns = (
         "discoverable/<int:pk>/discover/",
         views.DiscoverableDiscoverView.as_view(),
         name="discoverable_discover",
+    ),
+    path(
+        "discoverable/<int:pk>/ingest/",
+        views.DiscoverableIngestView.as_view(),
+        name="discoverable_ingest",
     ),
     path(
         "discoverable/<int:pk>/changelog/",

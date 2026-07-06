@@ -27,6 +27,13 @@ __license__ = "GPLv3"
                             without creating or updating discoverables. Start Scan saves the scan record and
                             can queue full device discovery.
                         </div>
+                        <div class="alert alert-secondary">
+                            Background workflow: <strong>Nmap</strong> reachability scan ->
+                            <strong>SNMP</strong> identity probe ->
+                            <strong>role/mode inference</strong> ->
+                            <strong>discoverable seeding</strong> ->
+                            <strong>queued device discovery & ingest</strong>.
+                        </div>
                         {% render_form form %}
                         {% if preview_error %}
                             <div class="alert alert-danger mt-3 mb-0">{{ preview_error }}</div>
@@ -92,6 +99,7 @@ __license__ = "GPLv3"
                                                 <th>Vendor</th>
                                                 <th>Selected Mode</th>
                                                 <th>Inferred Mode</th>
+                                                <th>Role Suggestion</th>
                                                 <th>SNMP</th>
                                             </tr>
                                         </thead>
@@ -103,6 +111,7 @@ __license__ = "GPLv3"
                                                     <td>{{ row.vendor|default:"-" }}</td>
                                                     <td>{{ row.selected_mode }}</td>
                                                     <td>{{ row.inferred_mode|default:"-" }}</td>
+                                                    <td>{% if row.inferred_role %}{{ row.inferred_role }}{% if row.role_confidence %} ({{ row.role_confidence }}){% endif %}{% else %}-{% endif %}</td>
                                                     <td>{% if row.snmp.error %}{{ row.snmp.error }}{% elif row.snmp.sys_name %}{{ row.snmp.sys_name }}{% else %}-{% endif %}</td>
                                                 </tr>
                                             {% endfor %}

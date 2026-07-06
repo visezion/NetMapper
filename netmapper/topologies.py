@@ -114,6 +114,12 @@ NETWORK_TEMPLATE = """
 </table>
 """
 
+LOCATION_GROUP_COLORS = {
+    "site": {"border": "#005f73", "background": "#dff6fb"},
+    "location": {"border": "#9b2226", "background": "#fde8e9"},
+    "rack": {"border": "#6a4c93", "background": "#efe6ff"},
+}
+
 
 def integer_hash(text, length=16):
     """Return a very simple and insecure interger hash.
@@ -133,6 +139,89 @@ def get_role_details(device_o):
         role_slug = ROLE_MAP.get(role_slug)
 
     return role_slug, role_color
+
+
+def get_device_location_group(device_o):
+    """Return the best available grouping tuple for a device-like object."""
+    rack_o = getattr(device_o, "rack", None)
+    if rack_o:
+        site_name = getattr(getattr(device_o, "site", None), "name", "Unknown site")
+        location_name = (
+            getattr(getattr(device_o, "location", None), "name", None) or site_name
+        )
+        return (
+            f"rack:{rack_o.pk}",
+            "rack",
+            f"{site_name} / {location_name} / Rack {rack_o.name}",
+        )
+
+    location_o = getattr(device_o, "location", None)
+    if location_o:
+        site_name = getattr(getattr(device_o, "site", None), "name", "Unknown site")
+        return (
+            f"location:{location_o.pk}",
+            "location",
+            f"{site_name} / {location_o.name}",
+        )
+
+    site_o = getattr(device_o, "site", None)
+    if site_o:
+        return (f"site:{site_o.pk}", "site", site_o.name)
+
+    return None
+
+
+def build_location_group_artifacts(nodes):
+    """Create hidden anchor links and visible group nodes for location clustering."""
+    group_members = {}
+    for node in nodes.values():
+        group_key = node.get("location_group_key")
+        if not group_key:
+            continue
+        group_members.setdefault(group_key, []).append(node)
+
+    group_nodes = []
+    group_edges = []
+    for group_key, members in group_members.items():
+        sample = members[0]
+        group_node_id = f"group::{group_key}"
+        color = LOCATION_GROUP_COLORS.get(
+            sample.get("location_group_type"),
+            {"border": "#4a5568", "background": "#edf2f7"},
+        )
+        group_nodes.append(
+            {
+                "id": group_node_id,
+                "label": sample.get("location_group_label"),
+                "shape": "box",
+                "margin": 12,
+                "font": {"size": 18, "color": color["border"], "face": "helvetica"},
+                "color": {
+                    "border": color["border"],
+                    "background": color["background"],
+                    "highlight": color,
+                    "hover": color,
+                },
+                "borderWidth": 2,
+                "physics": True,
+                "group_anchor": True,
+                "title": sample.get("location_group_label"),
+            }
+        )
+        for member in members:
+            group_edges.append(
+                {
+                    "id": f"{group_node_id}->{member['id']}",
+                    "from": group_node_id,
+                    "to": member["id"],
+                    "hidden": True,
+                    "physics": True,
+                    "length": 120,
+                    "smooth": False,
+                }
+            )
+
+    return group_nodes, group_edges
 
 
 def get_l2_topology_data(interface_list, details):
@@ -164,6 +253,13 @@ def get_l2_topology_data(interface_list, details):
                     device=device_o
                 ),
             }
+            location_group = get_device_location_group(device_o)
+            if location_group:
+                (
+                    nodes[device_id]["location_group_key"],
+                    nodes[device_id]["location_group_type"],
+                    nodes[device_id]["location_group_label"],
+                ) = location_group
             # Set position
             if "positions" in details and str(device_id) in details["positions"]:
                 nodes[device_id]["x"] = details["positions"][str(device_id)].get("x")
@@ -194,17 +290,19 @@ def get_l2_topology_data(interface_list, details):
                     ),
                 }
 
+    group_nodes, group_edges = build_location_group_artifacts(nodes)
+
     return {
-        "nodes": list(nodes.values()),
-        "edges": list(links.values()),
+        "nodes": list(nodes.values()) + group_nodes,
+        "edges": list(links.values()) + group_edges,
     }
 
 
 def get_l2_drawio_topology(interface_list, diagram):
     """Create a L2 DrawIO topology data from an Interface list."""
     data = get_l2_topology_data(interface_list, diagram.details)
-    nodes = data.get("nodes")
-    links = data.get("edges")
+    nodes = [node for node in data.get("nodes") if not node.get("group_anchor")]
+    links = [link for link in data.get("edges") if not link.get("hidden")]
 
     # Transform node list into dict using id a key
     nodes_dict = {item["id"]: item for item in nodes}
@@ -284,6 +382,13 @@ def get_l3_topology_data(interface_list, details):
                         NODE_TEMPLATE, autoescape=JINJA_AUTOESCAPE
                     ).render(device=device_o),
                 }
+                location_group = get_device_location_group(device_o)
+                if location_group:
+                    (
+                        nodes[device_id]["location_group_key"],
+                        nodes[device_id]["location_group_type"],
+                        nodes[device_id]["location_group_label"],
+                    ) = location_group
                 # Set position
                 if "positions" in details and str(device_id) in details["positions"]:
                     nodes[device_id]["x"] = details["positions"][str(device_id)].get(
@@ -342,17 +447,19 @@ def get_l3_topology_data(interface_list, details):
                     ).render(interface=interface_o, address=address_o),
                 }
 
+    group_nodes, group_edges = build_location_group_artifacts(nodes)
+
     return {
-        "nodes": list(nodes.values()) + list(networks.values()),
-        "edges": list(links.values()),
+        "nodes": list(nodes.values()) + list(networks.values()) + group_nodes,
+        "edges": list(links.values()) + group_edges,
     }
 
 
 def get_l3_drawio_topology(interface_list, diagram):
     """Create a L3 DrawIO topology data from an Interface list."""
     data = get_l3_topology_data(interface_list, diagram.details)
-    nodes = data.get("nodes")
-    links = data.get("edges")
+    nodes = [node for node in data.get("nodes") if not node.get("group_anchor")]
+    links = [link for link in data.get("edges") if not link.get("hidden")]
 
     # Transform node list into dict using id a key
     nodes_dict = {item["id"]: item for item in nodes}

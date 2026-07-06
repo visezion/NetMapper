@@ -1,0 +1,12 @@
+{% extends "base/layout.html" %}
+{% load helpers %}
+{% load form_helpers %}
+{% block title %}Discover & Ingest {{ object|meta:"verbose_name" }}?{% endblock title %}
+{% block page-header %}{% endblock page-header %}
+{% block content %}
+    <div class="modal" tabindex="-1" style="display: block; position: static">
+        <div class="modal-dialog">
+            <div class="modal-content">{% include "netmapper/htmx/ingest_form.html" %}</div>
+        </div>
+    </div>
+{% endblock content %}

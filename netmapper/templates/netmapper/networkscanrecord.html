@@ -5,6 +5,11 @@ __contact__ = "andrea@adainese.it"
 __copyright__ = "Copyright 2022, Andrea Dainese"
 __license__ = "GPLv3"
 {% endcomment %}
+{% block head %}
+    {% if auto_refresh %}
+        <meta http-equiv="refresh" content="10">
+    {% endif %}
+{% endblock head %}
 {% block content %}
     <div class="row mb-3">
         <div class="col col-md-6">
@@ -13,6 +18,9 @@ __license__ = "GPLv3"
                 <div class="card-body">
                     <table class="table table-hover attr-table">
                         <tr><th scope="row">Status</th><td>{{ object.get_status_display }}</td></tr>
+                        <tr><th scope="row">Stage</th><td>{{ object.summary.current_stage_label|default:"-" }}</td></tr>
+                        <tr><th scope="row">Progress</th><td>{{ object.summary.progress_percent|default:"0" }}%</td></tr>
+                        <tr><th scope="row">Stage Detail</th><td>{{ object.summary.status_message|default:"-" }}</td></tr>
                         <tr><th scope="row">Site</th><td>{{ object.site }}</td></tr>
                         <tr><th scope="row">Credential</th><td>{{ object.credential }}</td></tr>
                         <tr><th scope="row">SNMP Credential</th><td>{{ object.snmp_credential|default:"-" }}</td></tr>
@@ -45,6 +53,14 @@ __license__ = "GPLv3"
                     <pre class="mb-0">{{ object.targets }}</pre>
                 </div>
             </div>
+            {% if auto_refresh %}
+                <div class="card mt-3 border-info">
+                    <h5 class="card-header text-info">Live Status</h5>
+                    <div class="card-body">
+                        <p class="mb-0">This page refreshes every 10 seconds while the background scan is still active.</p>
+                    </div>
+                </div>
+            {% endif %}
             {% if object.error %}
                 <div class="card mt-3 border-danger">
                     <h5 class="card-header text-danger">Error</h5>
@@ -72,6 +88,7 @@ __license__ = "GPLv3"
                                 <th>Vendor</th>
                                 <th>Selected Mode</th>
                                 <th>Inferred Mode</th>
+                                <th>Role Suggestion</th>
                                 <th>SNMP</th>
                             </tr>
                         </thead>
@@ -83,11 +100,12 @@ __license__ = "GPLv3"
                                     <td>{{ row.vendor|default:"-" }}</td>
                                     <td>{{ row.selected_mode }}</td>
                                     <td>{{ row.inferred_mode|default:"-" }}</td>
+                                    <td>{% if row.inferred_role %}{{ row.inferred_role }}{% if row.role_confidence %} ({{ row.role_confidence }}){% endif %}{% else %}-{% endif %}</td>
                                     <td>{% if row.snmp.error %}{{ row.snmp.error }}{% elif row.snmp.sys_name %}{{ row.snmp.sys_name }}{% else %}-{% endif %}</td>
                                 </tr>
                             {% empty %}
                                 <tr>
-                                    <td colspan="6" class="text-muted">No result rows recorded.</td>
+                                    <td colspan="7" class="text-muted">No result rows recorded.</td>
                                 </tr>
                             {% endfor %}
                         </tbody>

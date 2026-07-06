@@ -67,6 +67,9 @@ class ScannedHostCandidate:
     inferred_mode: str | None = None
     snmp_metadata: SnmpHostMetadata | None = None
     identity_note: str | None = None
+    inferred_role: str | None = None
+    role_confidence: str | None = None
+    role_reason: str | None = None
 
     @property
     def snmp_failed(self):
@@ -401,6 +404,9 @@ def build_identity_note(
     snmp_metadata=None,
     selected_mode=None,
     inferred_mode=None,
+    inferred_role=None,
+    role_confidence=None,
+    role_reason=None,
 ):
     """Build a stable identity note to attach to a discoverable."""
     lines = [
@@ -427,6 +433,13 @@ def build_identity_note(
         lines.append(f"Inferred mode: {inferred_mode}")
     elif selected_mode:
         lines.append(f"Fallback mode: {selected_mode}")
+    if inferred_role:
+        lines.append(
+            f"Suggested role: {inferred_role}"
+            + (f" ({role_confidence} confidence)" if role_confidence else "")
+        )
+    if role_reason:
+        lines.append(f"Role evidence: {role_reason}")
     return "\n".join(lines)
 
 
@@ -453,6 +466,9 @@ def candidate_to_summary(candidate):
         "selected_mode": candidate.selected_mode,
         "inferred_mode": candidate.inferred_mode,
         "identity_note": candidate.identity_note,
+        "inferred_role": candidate.inferred_role,
+        "role_confidence": candidate.role_confidence,
+        "role_reason": candidate.role_reason,
     }
     if candidate.snmp_metadata:
         summary["snmp"] = {
@@ -462,6 +478,123 @@ def candidate_to_summary(candidate):
             "error": candidate.snmp_metadata.error,
         }
     return summary
+
+
+def infer_device_role(
+    sys_descr=None,
+    sys_object_id=None,
+    hostname=None,
+    vendor=None,
+):
+    """Infer a device role suggestion from lightweight identity data."""
+    parts = [value for value in [sys_descr, sys_object_id, hostname, vendor] if value]
+    fingerprint = " ".join(parts).lower()
+    hostname_lower = (hostname or "").lower()
+
+    if not fingerprint:
+        return None, None, None
+
+    rules = [
+        (
+            "firewall",
+            "high",
+            [
+                "firewall",
+                "fortigate",
+                "palo alto",
+                "pan-os",
+                "panos",
+                "asa",
+                "adaptive security appliance",
+                "checkpoint",
+                "srx",
+            ],
+        ),
+        (
+            "wireless-access-point",
+            "high",
+            [
+                "access point",
+                "wireless ap",
+                "aironet",
+                "aruba ap",
+                "unifi ap",
+                "wlc managed ap",
+            ],
+        ),
+        (
+            "wireless-controller",
+            "high",
+            [
+                "wireless controller",
+                "mobility controller",
+                "wlc",
+            ],
+        ),
+        (
+            "router",
+            "high",
+            [
+                "router",
+                "isr",
+                "asr",
+                "edge router",
+                "mx480",
+                "vrouter",
+            ],
+        ),
+        (
+            "switch",
+            "medium",
+            [
+                "switch",
+                "catalyst",
+                "nexus",
+                "c9300",
+                "c9200",
+                "c9500",
+                "c2960",
+                "procurve",
+                "arubaos-cx",
+                "comware",
+            ],
+        ),
+        (
+            "server",
+            "medium",
+            [
+                "linux",
+                "ubuntu",
+                "debian",
+                "centos",
+                "red hat",
+                "windows server",
+                "vmware",
+                "esxi",
+            ],
+        ),
+    ]
+
+    for role, confidence, markers in rules:
+        for marker in markers:
+            if marker in fingerprint:
+                return role, confidence, f"Matched identity marker '{marker}'"
+
+    hostname_rules = [
+        ("firewall", "medium", [r"\bfw\d*\b", r"\basa\d*\b", r"\bsrx\d*\b"]),
+        ("router", "medium", [r"\brtr\d*\b", r"\brt\d*\b", r"\bedge\d*\b"]),
+        ("switch", "medium", [r"\bsw\d*\b", r"\bacc-sw\d*\b", r"\bcore-sw\d*\b"]),
+        ("wireless-access-point", "medium", [r"\bap\d*\b", r"\bwifi-ap\d*\b"]),
+    ]
+    for role, confidence, patterns in hostname_rules:
+        for pattern in patterns:
+            if re.search(pattern, hostname_lower):
+                return role, confidence, f"Matched hostname pattern '{pattern}'"
+
+    if vendor and "cisco" in vendor.lower():
+        return "switch", "low", "Cisco vendor detected without stronger role markers"
+
+    return None, None, None
 
 
 def scan_host_candidates(
@@ -517,6 +650,9 @@ def scan_host_candidates(
     for host in hosts:
         selected_mode = default_mode
         inferred_mode = None
+        inferred_role = None
+        role_confidence = None
+        role_reason = None
         snmp_metadata = snmp_metadata_by_address.get(host.address)
 
         if snmp_community and snmp_metadata is None:
@@ -547,11 +683,20 @@ def scan_host_candidates(
             if inferred_mode:
                 selected_mode = inferred_mode
 
+        inferred_role, role_confidence, role_reason = infer_device_role(
+            sys_descr=snmp_metadata.sys_descr if snmp_metadata else None,
+            sys_object_id=snmp_metadata.sys_object_id if snmp_metadata else None,
+            hostname=(snmp_metadata.sys_name if snmp_metadata else None) or host.hostname,
+            vendor=host.vendor,
+        )
         identity_note = build_identity_note(
             host,
             snmp_metadata=snmp_metadata,
             selected_mode=selected_mode,
             inferred_mode=inferred_mode,
+            inferred_role=inferred_role,
+            role_confidence=role_confidence,
+            role_reason=role_reason,
         )
         candidates.append(
             ScannedHostCandidate(
@@ -560,6 +705,9 @@ def scan_host_candidates(
                 inferred_mode=inferred_mode,
                 snmp_metadata=snmp_metadata,
                 identity_note=identity_note,
+                inferred_role=inferred_role,
+                role_confidence=role_confidence,
+                role_reason=role_reason,
             )
         )
     return candidates

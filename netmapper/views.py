@@ -60,6 +60,16 @@ class BulkDiscoverAction(ObjectAction):
     template_name = "netmapper/buttons/bulk_discover.html"
 
 
+class BulkIngestAction(ObjectAction):
+    """Bulk ingest action for Discoverable list views."""
+
+    name = "bulk_ingest"
+    label = "Ingest Selected"
+    multi = True
+    permissions_required = {"change"}
+    template_name = "netmapper/buttons/bulk_ingest.html"
+
+
 #
 # ARPEntry views
 #
@@ -354,6 +364,12 @@ class NetworkScanView(PermissionRequiredMixin, FormView):
             snmp_timeout=form.cleaned_data["snmp_timeout"],
             estimated_host_count=plan.estimated_host_count,
             status=models.NetworkScanStatusChoices.QUEUED,
+            summary={
+                "current_stage": "queued",
+                "current_stage_label": "Queued",
+                "status_message": "Scan request created and waiting for a worker.",
+                "progress_percent": 0,
+            },
         )
 
     def _render_preview(self, form, plan, candidates=None, preview_error=None):
@@ -421,6 +437,10 @@ class NetworkScanView(PermissionRequiredMixin, FormView):
             record.snmp_failures_count = len([candidate for candidate in candidates if candidate.snmp_failed])
             record.summary = {
                 "preview_only": True,
+                "current_stage": "completed",
+                "current_stage_label": "Completed",
+                "status_message": "Dry run completed successfully.",
+                "progress_percent": 100,
                 "responsive_hosts_count": record.responsive_hosts_count,
                 "snmp_failures_count": record.snmp_failures_count,
             }
@@ -479,6 +499,10 @@ class NetworkScanRecordView(generic.ObjectView):
         return {
             "summary_rows": instance.results[:50],
             "job_health": job_health,
+            "auto_refresh": instance.status in {
+                models.NetworkScanStatusChoices.QUEUED,
+                models.NetworkScanStatusChoices.RUNNING,
+            },
         }
 
 
@@ -611,7 +635,15 @@ class DiscoverableListView(generic.ObjectListView):
         discoverylogs_count=Count("discoverylogs")
     ).order_by("device__name", "address")
     table = tables.DiscoverableTable
-    actions = (AddObject, BulkImport, BulkExport, BulkEdit, BulkDelete, BulkDiscoverAction)
+    actions = (
+        AddObject,
+        BulkImport,
+        BulkExport,
+        BulkEdit,
+        BulkDelete,
+        BulkDiscoverAction,
+        BulkIngestAction,
+    )
     template_name = "netmapper/discoverable_list.html"
     filterset = filtersets.DiscoverableFilterSet
     filterset_form = forms.DiscoverableListFilterForm
@@ -772,6 +804,127 @@ class DiscoverableDiscoverView(generic.ObjectDeleteView):
         )
 
 
+class DiscoverableIngestView(generic.ObjectDeleteView):
+    """
+    Ingest logs for a single discoverable.
+
+    Called from:
+    * DiscoverableListView clicking on the Ingest button on a specific Discoverable row.
+    * DiscoverableView clicking on the Ingest button.
+    """
+
+    queryset = models.Discoverable.objects.all()
+    template_name = "netmapper/discoverable_ingest.html"
+
+    def get_required_permission(self):
+        """Check permissions."""
+        return get_permission_for_model(self.queryset.model, "change")
+
+    def _get_ingestable_logs(self, queryset):
+        """Return logs eligible for ingestion for the given discoverables."""
+        return models.DiscoveryLog.objects.filter(
+            discoverable__in=queryset,
+            supported=True,
+            parsed=True,
+            ingested=False,
+        )
+
+    def _spawn_follow_up_job(self, request, queryset, ingestable_logs_count):
+        """Start ingest now or discovery first when logs do not exist yet."""
+        discoverables = list(queryset)
+        if ingestable_logs_count:
+            msg = (
+                f"Starting ingest on {discoverables[0]} "
+                f"({ingestable_logs_count} logs queued)"
+            )
+            messages.success(request, msg)
+            utils.spawn_script(
+                "Ingest",
+                user=request.user,
+                post_data={"discoverables": discoverables},
+            )
+            return
+
+        msg = (
+            f"No pending ingest logs exist for {discoverables[0]}. "
+            "Starting discovery instead; ingestion will follow automatically "
+            "when parsed logs are produced."
+        )
+        messages.info(request, msg)
+        utils.spawn_script(
+            "Discover",
+            user=request.user,
+            post_data={
+                "discoverables": discoverables,
+                "undiscovered_only": False,
+            },
+        )
+
+    def get_extra_context(self, request, obj):
+        """Expose ingestable log count to the templates."""
+        ingestable_logs_count = self._get_ingestable_logs(
+            self.queryset.filter(pk=obj.pk)
+        ).count()
+        return {"ingestable_logs_count": ingestable_logs_count}
+
+    def get(self, request, *args, **kwargs):
+        """Return the confirmation page."""
+        obj = self.get_object(**kwargs)
+        form = ConfirmationForm(initial=request.GET)
+
+        if htmx_partial(request):
+            viewname = get_viewname(self.queryset.model, action="ingest")
+            form_url = reverse(viewname, kwargs={"pk": obj.pk})
+            return render(
+                request,
+                "netmapper/htmx/ingest_form.html",
+                {
+                    "object": obj,
+                    "object_type": self.queryset.model._meta.verbose_name,  # pylint: disable=protected-access
+                    "form": form,
+                    "form_url": form_url,
+                    **self.get_extra_context(request, obj),
+                },
+            )
+
+        return render(
+            request,
+            self.template_name,
+            {
+                "object": obj,
+                "form": form,
+                "return_url": self.get_return_url(request, obj),
+                **self.get_extra_context(request, obj),
+            },
+        )
+
+    def post(self, request, *args, **kwargs):
+        """Start ingestion for a single discoverable."""
+        logger = logging.getLogger("netbox.plugins.netmapper")
+        obj = self.get_object(**kwargs)
+        form = ConfirmationForm(request.POST)
+
+        if form.is_valid():
+            logger.debug("Form validation was successful")
+            queryset = self.queryset.filter(pk=obj.pk)
+            ingestable_logs_count = self._get_ingestable_logs(queryset).count()
+            logger.info("Starting selected device processing on %s", obj)
+            self._spawn_follow_up_job(request, queryset, ingestable_logs_count)
+            return redirect(self.get_return_url(request, obj))
+
+        logger.debug("Form validation failed")
+        return render(
+            request,
+            self.template_name,
+            {
+                "object": obj,
+                "form": form,
+                "return_url": self.get_return_url(request, obj),
+                **self.get_extra_context(request, obj),
+            },
+        )
+
+
 class DiscoverableBulkDiscoverView(generic.BulkDeleteView):
     """
     Disocver devices in bulk.
@@ -848,6 +1001,124 @@ class DiscoverableBulkDiscoverView(generic.BulkDeleteView):
                 "form": form,
                 "table": table,
                 "return_url": self.get_return_url(request),
+                **self.get_extra_context(request),
+            },
+        )
+
+
+class DiscoverableBulkIngestView(generic.BulkDeleteView):
+    """
+    Ingest devices in bulk.
+
+    Called from:
+    * DiscoverableListView selecting Discoverable(s) and clicking on Ingest Selected button.
+    """
+
+    template_name = "netmapper/discoverable_bulk_ingest.html"
+    queryset = models.Discoverable.objects.prefetch_related("credential")
+    filterset = None
+    table = tables.DiscoverableTable
+    default_return_url = "plugins:netmapper:discoverable_list"
+
+    def get_required_permission(self):
+        """Check permissions."""
+        return get_permission_for_model(self.queryset.model, "change")
+
+    def _get_ingestable_logs(self, queryset):
+        """Return logs eligible for ingestion for the given discoverables."""
+        return models.DiscoveryLog.objects.filter(
+            discoverable__in=queryset,
+            supported=True,
+            parsed=True,
+            ingested=False,
+        )
+
+    def _spawn_follow_up_job(self, request, queryset, ingestable_logs_count):
+        """Start ingest now or discovery first when no ingestable logs exist."""
+        discoverables = list(queryset)
+        device_count = len(discoverables)
+        if ingestable_logs_count:
+            msg = (
+                f"Starting ingest on {device_count} devices "
+                f"({ingestable_logs_count} logs queued)"
+            )
+            messages.success(request, msg)
+            utils.spawn_script(
+                "Ingest",
+                user=request.user,
+                post_data={"discoverables": discoverables},
+            )
+            return
+
+        msg = (
+            f"No pending ingest logs exist for the selected {device_count} devices. "
+            "Starting discovery instead; ingestion will follow automatically "
+            "when parsed logs are produced."
+        )
+        messages.info(request, msg)
+        utils.spawn_script(
+            "Discover",
+            user=request.user,
+            post_data={
+                "discoverables": discoverables,
+                "undiscovered_only": False,
+            },
+        )
+
+    def post(self, request, **kwargs):
+        """Start the ingestion."""
+        logger = logging.getLogger("netbox.plugins.netmapper")
+        model = self.queryset.model
+
+        if request.POST.get("_all"):
+            queryset = model.objects.all()
+            pk_list = queryset.only("pk").values_list("pk", flat=True)
+        else:
+            pk_list = [int(pk) for pk in request.POST.getlist("pk")]
+
+        if "_confirm" in request.POST:
+            form = BulkDeleteForm(model, request.POST)
+            if form.is_valid():
+                logger.debug("Form validation was successful")
+                queryset = self.queryset.filter(pk__in=pk_list)
+                ingestable_logs_count = self._get_ingestable_logs(queryset).count()
+                discovery_count = queryset.count()
+                logger.info(
+                    "Starting selected device processing on %s %s",
+                    discovery_count,
+                    model._meta.verbose_name_plural,  # pylint: disable=protected-access
+                )
+                self._spawn_follow_up_job(request, queryset, ingestable_logs_count)
+                return redirect(self.get_return_url(request))
+
+            logger.debug("Form validation failed")
+        else:
+            form = BulkDeleteForm(
+                model,
+                initial={
+                    "pk": pk_list,
+                    "return_url": self.get_return_url(request),
+                },
+            )
+
+        queryset = self.queryset.filter(pk__in=pk_list)
+        table = self.table(queryset, orderable=False)
+        if not table.rows:
+            messages.warning(
+                request,
+                f"No {model._meta.verbose_name_plural} were selected for ingest.",  # pylint: disable=protected-access
+            )
+            return redirect(self.get_return_url(request))
+
+        return render(
+            request,
+            self.template_name,
+            {
+                "model": model,
+                "form": form,
+                "table": table,
+                "return_url": self.get_return_url(request),
+                "ingestable_logs_count": self._get_ingestable_logs(queryset).count(),
                 **self.get_extra_context(request),
             },
         )

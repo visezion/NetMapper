@@ -1,0 +1,28 @@
+{% extends "base/layout.html" %}
+{% load helpers %}
+{% load render_table from django_tables2 %}
+{% block title %}Discover & Ingest {{ table.rows|length }} {{ model|meta:"verbose_name_plural"|bettertitle }}?{% endblock title %}
+{% block content %}
+    <div class="container-xl px-0">
+        <div class="alert alert-info">
+            {% if ingestable_logs_count %}
+                {{ ingestable_logs_count }} parsed, supported, un-ingested log{% if ingestable_logs_count != 1 %}s{% endif %} are ready now and will be ingested immediately.
+            {% else %}
+                No pending ingest logs exist yet. NetMapper will start discovery first, then continue with ingestion when parsed logs are produced.
+            {% endif %}
+        </div>
+        <div class="table-responsive">{% render_table table "inc/table.html" %}</div>
+        <div class="row mt-3">
+            <form action="" method="post">
+                {% csrf_token %}
+                {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+                <div class="text-end">
+                    <a href="{{ return_url }}" class="btn btn-outline-dark">Cancel</a>
+                    <button type="submit" name="_confirm" class="btn btn-primary">
+                        Discover & Ingest {{ table.rows|length }} {{ model|meta:"verbose_name_plural" }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock content %}

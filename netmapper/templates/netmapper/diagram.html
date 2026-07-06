@@ -34,6 +34,10 @@ __license__ = "GPLv3"
             <div class="alert alert-warning m-3" role="alert">
                 {{ topology_empty_message }}
             </div>
+        {% else %}
+            <div class="alert alert-info m-3 mb-0" role="alert">
+                Diagram grouping follows the saved diagram settings from the edit form.
+            </div>
         {% endif %}
         <!-- djlint:off -->
         <div id="visgraph" style="height: 70vh;"></div>

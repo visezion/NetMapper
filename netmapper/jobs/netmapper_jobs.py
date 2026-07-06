@@ -115,6 +115,23 @@ def _spawn_discovery_batch(
     )
 
 
+def _ensure_selected_discoverables_enabled(script_handler, discoverables):
+    """Enable explicitly selected discoverables before running discovery."""
+    updated_addresses = []
+    for discoverable_o in discoverables or []:
+        if discoverable_o.discoverable:
+            continue
+        discoverable_o.discoverable = True
+        discoverable_o.save(update_fields=["discoverable", "last_updated"])
+        updated_addresses.append(str(discoverable_o.address))
+
+    if updated_addresses:
+        script_handler.log_info(
+            "Enabled discoverable flag for explicitly selected devices: "
+            + ", ".join(updated_addresses)
+        )
+
+
 class CreateDeviceRole(Script):
     """Script used to create DeviceRole used in Diagram.
 
@@ -363,6 +380,38 @@ class ScanNetwork(Script):
             setattr(scan_record, field, value)
         scan_record.save()
 
+    def _update_scan_progress(
+        self,
+        scan_record,
+        *,
+        stage,
+        status_message,
+        progress=None,
+        extra_summary=None,
+        persist_status=None,
+    ):
+        """Store human-readable stage progress in the scan record summary."""
+        if not scan_record:
+            return
+        summary = dict(scan_record.summary or {})
+        summary.update(
+            {
+                "current_stage": stage,
+                "current_stage_label": stage.replace("_", " ").title(),
+                "status_message": status_message,
+            }
+        )
+        if progress is not None:
+            summary["progress_percent"] = int(progress)
+        if extra_summary:
+            summary.update(extra_summary)
+        fields = {
+            "summary": summary,
+        }
+        if persist_status:
+            fields["status"] = persist_status
+        self._save_scan_record(scan_record, **fields)
+
     def _log_candidate_identity(self, candidate):
         """Write a concise identity summary for a responsive host."""
         identity_fragments = []
@@ -376,6 +425,11 @@ class ScanNetwork(Script):
             identity_fragments.append(f"snmp sysDescr={candidate.snmp_metadata.sys_descr}")
         if candidate.inferred_mode:
             identity_fragments.append(f"inferred mode={candidate.inferred_mode}")
+        if candidate.inferred_role:
+            role_text = candidate.inferred_role
+            if candidate.role_confidence:
+                role_text += f" ({candidate.role_confidence})"
+            identity_fragments.append(f"suggested role={role_text}")
         if identity_fragments:
             self.log_info(f"{candidate.host.address}: {'; '.join(identity_fragments)}")
 
@@ -406,6 +460,12 @@ class ScanNetwork(Script):
                     scan_record,
                     status=NetworkScanStatusChoices.RUNNING,
                     started_at=timezone.now(),
+                )
+                self._update_scan_progress(
+                    scan_record,
+                    stage="planning",
+                    status_message="Validating scan targets and safety limits.",
+                    progress=5,
                 )
 
             plan = build_scan_plan(
@@ -449,6 +509,16 @@ class ScanNetwork(Script):
                 f"Scanning {len(plan.normalized_targets)} target specs covering approximately "
                 f"{plan.estimated_host_count} IPs"
             )
+            self._update_scan_progress(
+                scan_record,
+                stage="nmap_scan",
+                status_message="Running Nmap reachability scan.",
+                progress=15,
+                extra_summary={
+                    "responsive_hosts_count": 0,
+                    "normalized_target_count": len(plan.normalized_targets),
+                },
+            )
 
             try:
                 candidates = scan_host_candidates(
@@ -475,6 +545,18 @@ class ScanNetwork(Script):
                 )
                 self.log_failure(str(exc))
                 return ""
+
+            self._update_scan_progress(
+                scan_record,
+                stage="snmp_enrichment",
+                status_message=(
+                    "Nmap completed. Evaluating SNMP identity and role suggestions."
+                ),
+                progress=45,
+                extra_summary={
+                    "responsive_hosts_count": len(candidates),
+                },
+            )
 
             if not candidates:
                 self._save_scan_record(
@@ -578,6 +660,19 @@ class ScanNetwork(Script):
             self.log_info(
                 f"Scan complete: {created_count} created, {updated_count} updated, {reused_count} reused"
             )
+            self._update_scan_progress(
+                scan_record,
+                stage="seed_discoverables",
+                status_message="Responsive hosts have been converted into discoverables.",
+                progress=70,
+                extra_summary={
+                    "responsive_hosts_count": len(candidates),
+                    "created_count": created_count,
+                    "updated_count": updated_count,
+                    "reused_count": reused_count,
+                    "snmp_failures_count": snmp_failures_count,
+                },
+            )
 
             summary = {
                 "discover_now": discover_now,
@@ -588,6 +683,14 @@ class ScanNetwork(Script):
             }
 
             if not discover_now:
+                summary.update(
+                    {
+                        "current_stage": "completed",
+                        "current_stage_label": "Completed",
+                        "status_message": "Scan finished without queued discovery.",
+                        "progress_percent": 100,
+                    }
+                )
                 self._save_scan_record(
                     scan_record,
                     status=NetworkScanStatusChoices.COMPLETED,
@@ -606,6 +709,17 @@ class ScanNetwork(Script):
                 )
                 return ""
 
+            self._update_scan_progress(
+                scan_record,
+                stage="queue_discovery",
+                status_message=(
+                    "Queueing NetMapper device discovery and ingestion for responsive hosts."
+                ),
+                progress=85,
+                extra_summary={
+                    "queued_discovery_count": len(scan_discoverables),
+                },
+            )
             output = _spawn_discovery_batch(
                 self,
                 scan_discoverables,
@@ -613,6 +727,14 @@ class ScanNetwork(Script):
                 filter_type=filter_type,
             )
             summary["queued_discovery_count"] = len(scan_discoverables)
+            summary.update(
+                {
+                    "current_stage": "completed",
+                    "current_stage_label": "Completed",
+                    "status_message": "Scan finished and downstream discovery jobs were queued.",
+                    "progress_percent": 100,
+                }
+            )
             self._save_scan_record(
                 scan_record,
                 status=NetworkScanStatusChoices.COMPLETED,
@@ -634,6 +756,13 @@ class ScanNetwork(Script):
         except Exception as exc:
             error_message = f"{type(exc).__name__}: {exc}"
             traceback_text = traceback.format_exc()
+            if scan_record:
+                self._update_scan_progress(
+                    scan_record,
+                    stage="failed",
+                    status_message=error_message,
+                    progress=100,
+                )
             self._save_scan_record(
                 scan_record,
                 status=NetworkScanStatusChoices.FAILED,
@@ -703,6 +832,7 @@ class Discover(Script):
                 f"Starting first discovery on {', '.join(discoverable_ip_addresses)}"
             )
         elif discoverables:
+            _ensure_selected_discoverables_enabled(self, discoverables)
             discoverable_ip_addresses = [
                 str(discoverable_o.address) for discoverable_o in discoverables
             ]

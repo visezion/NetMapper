@@ -6,8 +6,10 @@ from unittest.mock import patch
 from netmapper.network_discovery import (
     build_identity_note,
     build_scan_plan,
+    candidate_to_summary,
     expand_target_spec_addresses,
     estimate_target_host_count,
+    infer_device_role,
     infer_discovery_mode,
     merge_identity_note,
     run_snmp_identity_probe,
@@ -16,6 +18,7 @@ from netmapper.network_discovery import (
     parse_target_specs,
     scan_host_candidates,
     NmapHostResult,
+    ScannedHostCandidate,
     SnmpHostMetadata,
 )
 
@@ -200,13 +203,56 @@ class NetworkDiscoveryHelperTest(SimpleTestCase):
             snmp_metadata=snmp,
             selected_mode="netmiko_cisco_ios",
             inferred_mode="netmiko_cisco_ios",
+            inferred_role="switch",
+            role_confidence="medium",
+            role_reason="Matched identity marker 'cisco ios'",
         )
         self.assertIn("Address: 192.0.2.10", note)
         self.assertIn("Nmap hostname: edge-sw1", note)
         self.assertIn("SNMP sysName: edge-sw1", note)
+        self.assertIn("Suggested role: switch (medium confidence)", note)
         merged = merge_identity_note("Existing comments", note)
         self.assertIn("Existing comments", merged)
         self.assertIn("Network scan identity", merged)
+
+    def test_infer_device_role(self):
+        """Identity markers should produce stable role suggestions."""
+        role, confidence, reason = infer_device_role(
+            sys_descr="Cisco Adaptive Security Appliance Version 9.18",
+            hostname="fw-edge-1",
+        )
+        self.assertEqual(role, "firewall")
+        self.assertEqual(confidence, "high")
+        self.assertIn("adaptive security appliance", reason)
+        role, confidence, reason = infer_device_role(
+            sys_descr="Cisco IOS Software, C9300",
+            hostname="core-sw1",
+        )
+        self.assertEqual(role, "switch")
+        self.assertEqual(confidence, "medium")
+        self.assertTrue("c9300" in reason or "switch" in reason)
+
+    def test_candidate_to_summary_includes_role_metadata(self):
+        """Candidate summaries should expose role inference details to the UI."""
+        candidate = ScannedHostCandidate(
+            host=NmapHostResult(address="192.0.2.10", hostname="fw-edge-1"),
+            selected_mode="netmiko_cisco_ios",
+            inferred_mode="netmiko_cisco_ios",
+            snmp_metadata=SnmpHostMetadata(
+                address="192.0.2.10",
+                sys_name="fw-edge-1",
+                sys_descr="Cisco Adaptive Security Appliance",
+                sys_object_id="1.3.6.1.4.1.9.1.669",
+            ),
+            identity_note="identity",
+            inferred_role="firewall",
+            role_confidence="high",
+            role_reason="Matched identity marker 'firewall'",
+        )
+        summary = candidate_to_summary(candidate)
+        self.assertEqual(summary["inferred_role"], "firewall")
+        self.assertEqual(summary["role_confidence"], "high")
+        self.assertIn("Matched identity marker", summary["role_reason"])
 
     @patch("netmapper.network_discovery.run_snmp_identity_probe")
     @patch("netmapper.network_discovery.run_nmap_ping_scan")
@@ -251,3 +297,4 @@ class NetworkDiscoveryHelperTest(SimpleTestCase):
         self.assertTrue(
             all(candidate.snmp_metadata and candidate.snmp_metadata.sys_name for candidate in candidates)
         )
+        self.assertTrue(all(candidate.inferred_role == "switch" for candidate in candidates))

@@ -1,0 +1,32 @@
+{% load form_helpers %}
+<form action="{{ form_url }}" method="post">
+    {% csrf_token %}
+    <div class="modal-header">
+        <h5 class="modal-title">Confirm Discover & Ingest</h5>
+    </div>
+    <div class="modal-body">
+        <p>
+            Are you sure you want to process {{ object_type }} <strong>{{ object }}</strong>?
+        </p>
+        {% if ingestable_logs_count %}
+            <p class="text-muted mb-3">
+                {{ ingestable_logs_count }} parsed, supported, un-ingested log{% if ingestable_logs_count != 1 %}s{% endif %} are ready and will be ingested now.
+            </p>
+        {% else %}
+            <p class="text-muted mb-3">
+                No pending ingest logs exist yet. NetMapper will start discovery first and continue with ingestion automatically when parsed logs are produced.
+            </p>
+        {% endif %}
+        {% render_form form %}
+    </div>
+    <div class="modal-footer">
+        {% if return_url %}
+            <a href="{{ return_url }}" class="btn btn-outline-secondary">Cancel</a>
+        {% else %}
+            <button type="button"
+                    class="btn btn-outline-secondary"
+                    data-bs-dismiss="modal">Cancel</button>
+        {% endif %}
+        <button type="submit" class="btn btn-primary">Discover & Ingest</button>
+    </div>
+</form>

@@ -102,6 +102,18 @@ class NetworkScanRecordTable(NetBoxTable):
     created = tables.DateTimeColumn(linkify=True)
     site = tables.Column(linkify=True)
     status = ChoiceFieldColumn()
+    progress = tables.Column(
+        accessor="summary.progress_percent",
+        verbose_name="Progress",
+        orderable=False,
+        default="0",
+    )
+    stage = tables.Column(
+        accessor="summary.current_stage_label",
+        verbose_name="Stage",
+        orderable=False,
+        default="Queued",
+    )
     actions = []  # Read-only history records
 
     class Meta(NetBoxTable.Meta):
@@ -114,6 +126,8 @@ class NetworkScanRecordTable(NetBoxTable):
             "created",
             "site",
             "status",
+            "progress",
+            "stage",
             "dry_run",
             "default_mode",
             "estimated_host_count",
@@ -128,6 +142,8 @@ class NetworkScanRecordTable(NetBoxTable):
             "created",
             "site",
             "status",
+            "progress",
+            "stage",
             "dry_run",
             "default_mode",
             "estimated_host_count",
@@ -174,7 +190,12 @@ class DiscoverableTable(NetBoxTable):
         <i class="mdi mdi-refresh"></i>
     </a>
     """
-    actions = ActionsColumn(extra_buttons=discovery_button)
+    ingest_button = """
+    <a class="btn btn-sm btn-primary" href="{% url 'plugins:netmapper:discoverable_ingest' pk=record.pk %}" title="Discover &amp; Ingest">
+        <i class="mdi mdi-database-import"></i>
+    </a>
+    """
+    actions = ActionsColumn(extra_buttons=discovery_button + ingest_button)
 
     class Meta(NetBoxTable.Meta):
         """Table metadata."""
@@ -220,7 +241,12 @@ class DiscoverableTableWOLogCount(NetBoxTable):
         <i class="mdi mdi-refresh"></i>
     </a>
     """
-    actions = ActionsColumn(extra_buttons=discovery_button)
+    ingest_button = """
+    <a class="btn btn-sm btn-primary" href="{% url 'plugins:netmapper:discoverable_ingest' pk=record.pk %}" title="Discover &amp; Ingest">
+        <i class="mdi mdi-database-import"></i>
+    </a>
+    """
+    actions = ActionsColumn(extra_buttons=discovery_button + ingest_button)
 
     class Meta(NetBoxTable.Meta):
         """Table metadata."""

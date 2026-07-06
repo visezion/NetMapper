@@ -26,6 +26,20 @@ def discover_button(instance):
     }
 
 
+@register.inclusion_tag("netmapper/buttons/ingest.html")
+def ingest_button(instance):
+    """Add ingest button.
+
+    Used in templates/netmapper.
+    """
+    viewname = get_viewname(instance, "ingest")
+    url = reverse(viewname, kwargs={"pk": instance.pk})
+
+    return {
+        "url": url,
+    }
+
+
 @register.inclusion_tag("netmapper/buttons/export.html")
 def export_button(instance):
     """Add export button.

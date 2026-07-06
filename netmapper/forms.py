@@ -145,6 +145,11 @@ class DiagramForm(NetBoxModelForm):
 
     name = forms.CharField(required=True, strip=True)
     mode = forms.ChoiceField(choices=DiagramModeChoices, required=True)
+    group_clusters = forms.BooleanField(
+        required=False,
+        initial=True,
+        help_text="Group devices visually by rack, location, or site on the diagram.",
+    )
     vrfs = DynamicModelMultipleChoiceField(
         queryset=VRF.objects.all(),
         required=False,
@@ -171,6 +176,7 @@ class DiagramForm(NetBoxModelForm):
         fields = [
             "name",
             "mode",
+            "group_clusters",
             "device_roles",
             "sites",
             "vrfs",
@@ -178,12 +184,31 @@ class DiagramForm(NetBoxModelForm):
             "tags",
         ]
 
+    def __init__(self, *args, **kwargs):
+        """Populate custom diagram-detail settings from the JSON details field."""
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            self.fields["group_clusters"].initial = (
+                self.instance.details.get("group_clusters", True)
+            )
+
     def clean_name(self):
         """Reject blank names after trimming whitespace."""
         name = self.cleaned_data["name"].strip()
         if not name:
             raise forms.ValidationError("Name is required.")
         return name
+
+    def save(self, commit=True):
+        """Persist custom diagram settings back into the JSON details field."""
+        instance = super().save(commit=False)
+        details = dict(instance.details or {})
+        details["group_clusters"] = self.cleaned_data.get("group_clusters", True)
+        instance.details = details
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
 
 
 #
