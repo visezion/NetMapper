@@ -72,6 +72,16 @@ def normalize_job_uuid(job_id):
         return None
 
 
+def normalize_job_uuid_list(job_ids):
+    """Return only valid canonical UUID strings from a list of stored job IDs."""
+    normalized_ids = []
+    for job_id in job_ids or []:
+        normalized_job_id = normalize_job_uuid(job_id)
+        if normalized_job_id:
+            normalized_ids.append(normalized_job_id)
+    return normalized_ids
+
+
 def evaluate_scan_job_health(
     *,
     record_status,
@@ -232,7 +242,7 @@ def link_scan_record_job_id(scan_record, match_window_seconds=30):
         return None
 
     window = timedelta(seconds=int(match_window_seconds))
-    linked_job_ids = list(
+    linked_job_ids = normalize_job_uuid_list(
         NetworkScanRecord.objects.exclude(pk=scan_record.pk)
         .exclude(job_id="")
         .values_list("job_id", flat=True)

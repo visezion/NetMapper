@@ -5,7 +5,11 @@ from datetime import timedelta
 from django.test import SimpleTestCase
 from django.utils import timezone
 
-from netmapper.job_tracking import evaluate_scan_job_health, normalize_job_uuid
+from netmapper.job_tracking import (
+    evaluate_scan_job_health,
+    normalize_job_uuid,
+    normalize_job_uuid_list,
+)
 from netmapper.models import NetworkScanStatusChoices
 
 
@@ -83,3 +87,11 @@ class ScanJobHealthTest(SimpleTestCase):
     def test_normalize_job_uuid_rejects_legacy_numeric_ids(self):
         """Legacy numeric job IDs should be treated as invalid UUIDs."""
         self.assertIsNone(normalize_job_uuid("3"))
+
+    def test_normalize_job_uuid_list_filters_invalid_values(self):
+        """Only valid UUIDs should be passed into CoreJob UUID lookups."""
+        valid_uuid = "12345678-1234-5678-1234-567812345678"
+        self.assertEqual(
+            normalize_job_uuid_list(["3", "", None, valid_uuid]),
+            [valid_uuid],
+        )
