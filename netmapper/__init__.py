@@ -127,12 +127,21 @@ class NetmapperConfig(PluginConfig):
     name = "netmapper"
     verbose_name = "NetMapper"
     description = (
-        "Network discovery, topology mapping, and operational documentation for NetBox"
+        "Automatically scan your network, detect device platforms and types, map "
+        "physical connections, and bring discovered infrastructure into NetBox "
+        "with structured discovery workflows."
     )
     version = "0.1.0"
     author = "Victor Ayodeji Oluwasusi"
     author_email = "oluwasusiv@gmail.com"
     base_url = "netmapper"
+    min_version = "4.6.0"
+    max_version = "4.6.99"
+    homepage = "https://github.com/visezion/NetMapper"
+    source_url = "https://github.com/visezion/NetMapper"
+    documentation_url = "https://github.com/visezion/NetMapper#readme"
+    support_url = "https://github.com/visezion/NetMapper/issues"
+    license = "GNU General Public License v3.0"
     required_settings = []
     default_settings = {
         "MAX_INGESTED_LOGS": 25,

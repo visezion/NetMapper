@@ -14,25 +14,41 @@ __license__ = "GPLv3"
             <form method="post">
                 {% csrf_token %}
                 <div class="card">
-                    <h5 class="card-header">Network Scan</h5>
+                    <h5 class="card-header d-flex justify-content-between align-items-center">
+                        <span>Network Scan</span>
+                        <span class="badge bg-primary">Nmap + SNMP</span>
+                    </h5>
                     <div class="card-body">
-                        <p class="text-muted">
-                            Scan IPs, CIDRs, or explicit ranges with Nmap, optionally enrich responsive hosts
-                            with a stored SNMP credential, create or update NetMapper discoverables, and,
-                            when <strong>Discover Now</strong> is enabled, immediately queue the normal
-                            NetMapper discovery and ingest workflow.
-                        </p>
-                        <div class="alert alert-info">
-                            Preview validates targets only. Dry Run performs Nmap and optional SNMP checks
-                            without creating or updating discoverables. Start Scan saves the scan record and
-                            can queue full device discovery.
+                        <div class="mb-4">
+                            <p class="mb-2 fs-5">
+                                Discover devices from IPs, CIDRs, or explicit ranges and seed NetMapper with
+                                clean, validated targets.
+                            </p>
+                            <p class="text-muted mb-0">
+                                Use Preview to validate scope, Dry Run to test reachability and SNMP enrichment
+                                without saving, or Start Scan to create discoverables and optionally queue
+                                full discovery.
+                            </p>
                         </div>
-                        <div class="alert alert-secondary">
-                            Background workflow: <strong>Nmap</strong> reachability scan ->
-                            <strong>SNMP</strong> identity probe ->
-                            <strong>role/mode inference</strong> ->
-                            <strong>discoverable seeding</strong> ->
-                            <strong>queued device discovery & ingest</strong>.
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <div class="border rounded p-3 h-100 bg-body-tertiary">
+                                    <div class="fw-semibold mb-1">Preview</div>
+                                    <div class="text-muted small">Validate targets, host count, and scan safety before running.</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="border rounded p-3 h-100 bg-body-tertiary">
+                                    <div class="fw-semibold mb-1">Dry Run</div>
+                                    <div class="text-muted small">Run Nmap and optional SNMP checks without creating or updating records.</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="border rounded p-3 h-100 bg-body-tertiary">
+                                    <div class="fw-semibold mb-1">Start Scan</div>
+                                    <div class="text-muted small">Save the scan record and queue downstream discovery when enabled.</div>
+                                </div>
+                            </div>
                         </div>
                         {% render_form form %}
                         {% if preview_error %}

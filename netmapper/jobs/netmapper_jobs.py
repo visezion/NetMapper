@@ -32,6 +32,7 @@ from netmapper.models import (
     NetworkScanRecord as NetworkScanRecord_m,
     NetworkScanStatusChoices,
     SnmpVersionChoices,
+    SnmpCredential as SnmpCredential_m,
     DiscoveryLog as DiscoveryLog_m,
     ArpTableEntry as ArpTableEntry_m,
     MacAddressTableEntry as MacAddressTableEntry_m,
@@ -310,8 +311,19 @@ class ScanNetwork(Script):
         ),
         required=True,
     )
+    snmp_credential = ObjectVar(
+        model=SnmpCredential_m,
+        description=(
+            "Optional stored SNMP credential used for platform inference. "
+            "When selected, it overrides the manual SNMP fields below."
+        ),
+        required=False,
+    )
     snmp_community = StringVar(
-        description="Optional SNMP v2c community used to infer platform identity.",
+        description=(
+            "Optional manual SNMP v2c community used to infer platform identity "
+            "when no stored SNMP credential is selected."
+        ),
         required=False,
     )
     snmp_port = IntegerVar(
@@ -380,6 +392,37 @@ class ScanNetwork(Script):
             setattr(scan_record, field, value)
         scan_record.save()
 
+    @staticmethod
+    def _create_scan_record(data, plan, dry_run=False):
+        """Create a scan history record for direct script execution."""
+        return NetworkScanRecord_m.objects.create(
+            site=data["site"],
+            credential=data["credential"],
+            snmp_credential=data.get("snmp_credential"),
+            default_mode=data["default_mode"],
+            targets=data["targets"],
+            normalized_targets=plan.normalized_targets,
+            invalid_targets=plan.invalid_targets,
+            filters=data.get("filters") or "",
+            filter_type=data.get("filter_type") or "",
+            discover_now=bool(data.get("discover_now")),
+            overwrite_mode=bool(data.get("overwrite_mode")),
+            dry_run=dry_run,
+            store_identity_notes=data.get("store_identity_notes", True),
+            max_hosts=data.get("max_hosts") or SUBNET_SCAN_MAX_HOSTS,
+            nmap_host_timeout=data.get("nmap_host_timeout") or NMAP_HOST_TIMEOUT,
+            snmp_timeout=data.get("snmp_timeout") or SNMP_TIMEOUT,
+            estimated_host_count=plan.estimated_host_count,
+            status=NetworkScanStatusChoices.QUEUED,
+            summary={
+                "current_stage": "queued",
+                "current_stage_label": "Queued",
+                "status_message": "Scan request created and waiting for a worker.",
+                "progress_percent": 0,
+                "created_from": "extras_script",
+            },
+        )
+
     def _update_scan_progress(
         self,
         scan_record,
@@ -447,31 +490,41 @@ class ScanNetwork(Script):
             overwrite_mode = data.get("overwrite_mode")
             discover_now = data.get("discover_now")
             store_identity_notes = data.get("store_identity_notes", True)
-            snmp_community = (data.get("snmp_community") or "").strip()
-            snmp_port = data.get("snmp_port") or 161
-            snmp_version = data.get("snmp_version") or SnmpVersionChoices.V2C
             scan_record_id = data.get("scan_record_id") or 0
             filters = _normalize_filters(data.get("filters"))
             filter_type = data.get("filter_type")
+            snmp_credential = data.get("snmp_credential")
 
-            if scan_record_id:
-                scan_record = NetworkScanRecord_m.objects.filter(pk=scan_record_id).first()
-                self._save_scan_record(
-                    scan_record,
-                    status=NetworkScanStatusChoices.RUNNING,
-                    started_at=timezone.now(),
-                )
-                self._update_scan_progress(
-                    scan_record,
-                    stage="planning",
-                    status_message="Validating scan targets and safety limits.",
-                    progress=5,
-                )
+            snmp_community = (data.get("snmp_community") or "").strip()
+            snmp_port = data.get("snmp_port") or 161
+            snmp_version = data.get("snmp_version") or SnmpVersionChoices.V2C
+            if snmp_credential:
+                snmp_community = snmp_credential.get_secrets().get("community") or ""
+                snmp_port = snmp_credential.port
+                snmp_version = snmp_credential.version
 
             plan = build_scan_plan(
                 data.get("targets"),
                 data.get("max_hosts") or SUBNET_SCAN_MAX_HOSTS,
             )
+
+            if scan_record_id:
+                scan_record = NetworkScanRecord_m.objects.filter(pk=scan_record_id).first()
+            if not scan_record:
+                scan_record = self._create_scan_record(data, plan)
+
+            self._save_scan_record(
+                scan_record,
+                status=NetworkScanStatusChoices.RUNNING,
+                started_at=timezone.now(),
+            )
+            self._update_scan_progress(
+                scan_record,
+                stage="planning",
+                status_message="Validating scan targets and safety limits.",
+                progress=5,
+            )
+
             for invalid_target in plan.invalid_targets:
                 self.log_warning(f"Skipping invalid target {invalid_target}")
 

@@ -15,16 +15,25 @@ __copyright__ = "Copyright 2022, Andrea Dainese"
 __license__ = "GPLv3"
 __version__ = "0.1.0"
 
+from pathlib import Path
+
 from setuptools import find_packages, setup
+
+README = Path(__file__).with_name("README.md").read_text(encoding="utf-8")
 
 setup(
     name="netmapper",
     version=__version__,
-    description="Network discovery, topology mapping, and operational documentation for NetBox",
+    description=(
+        "Auto-discover network devices, identify platforms, map links, and sync "
+        "physical infrastructure into NetBox"
+    ),
+    long_description=README,
+    long_description_content_type="text/markdown",
     url="https://github.com/visezion/NetMapper",
     author="Victor Ayodeji Oluwasusi",
     author_email="oluwasusiv@gmail.com",
-    license="GNU v3.0",
+    license="GNU General Public License v3.0",
     install_requires=[
         "ipaddress==1.0.23",
         "jsonschema==3.2.0",
@@ -49,6 +58,10 @@ setup(
         "Programming Language :: Python :: 3 :: Only",
     ],
     project_urls={
+        "Documentation": "https://github.com/visezion/NetMapper#readme",
+        "Issues": "https://github.com/visezion/NetMapper/issues",
+        "Version History": "https://github.com/visezion/NetMapper/commits/main",
+        "Releases": "https://github.com/visezion/NetMapper/releases",
         "Source": "https://github.com/visezion/NetMapper",
     },
 )
