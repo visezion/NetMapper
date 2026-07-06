@@ -12,15 +12,12 @@ __license__ = "GPLv3"
 
 import re
 import json
-import base64
 from xml.parsers.expat import ExpatError
 import xmltodict
-from cryptography.fernet import Fernet, InvalidToken
 from OuiLookup import OuiLookup
 
 from django.db import models
 from django.urls import reverse
-from django.conf import settings
 
 from ipam.fields import IPAddressField
 from dcim.fields import MACAddressField
@@ -40,8 +37,7 @@ from netmapper.dictionaries import (
     RouteTypeChoices,
 )
 
-SECRET_KEY = settings.SECRET_KEY.encode("utf-8")
-FERNET_KEY = base64.urlsafe_b64encode(SECRET_KEY.ljust(32)[:32])
+from netmapper.security import decrypt_secret
 
 
 #
@@ -193,21 +189,10 @@ class Credential(NetBoxModel):
 
     def get_secrets(self):
         """Get clear text password."""
-        fernet_o = Fernet(FERNET_KEY)
         secrets = {}
         for field in CREDENTIAL_ENCRYPTED_FIELDS:
             original_secret = getattr(self, field)
-            if original_secret:
-                # Check if already decrypted
-                try:
-                    secret = fernet_o.decrypt(
-                        original_secret.encode()  # pylint: disable=no-member
-                    ).decode()
-                except InvalidToken:
-                    secret = original_secret
-            else:
-                secret = None
-            secrets[field] = secret
+            secrets[field] = decrypt_secret(original_secret)
         return secrets
 
 
@@ -247,20 +232,10 @@ class SnmpCredential(NetBoxModel):
 
     def get_secrets(self):
         """Get clear text SNMP secrets."""
-        fernet_o = Fernet(FERNET_KEY)
         secrets = {}
         for field in SNMP_CREDENTIAL_ENCRYPTED_FIELDS:
             original_secret = getattr(self, field)
-            if original_secret:
-                try:
-                    secret = fernet_o.decrypt(
-                        original_secret.encode()  # pylint: disable=no-member
-                    ).decode()
-                except InvalidToken:
-                    secret = original_secret
-            else:
-                secret = None
-            secrets[field] = secret
+            secrets[field] = decrypt_secret(original_secret)
         return secrets
 
 

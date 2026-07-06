@@ -326,6 +326,7 @@ Supported `PLUGINS_CONFIG["netmapper"]` settings:
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
+| `CREDENTIAL_FERNET_KEY` | empty, falls back to NetBox `SECRET_KEY` derivation | dedicated Fernet key for stored discovery/SNMP secrets |
 | `NTC_TEMPLATES_DIR` | bundled fallback or `/opt/ntc-templates/...` in Docker | TextFSM template directory |
 | `MAX_INGESTED_LOGS` | `25` | log ingestion limit |
 | `NMAP_EXECUTABLE` | `nmap` | binary used for subnet/range scanning |
@@ -346,6 +347,7 @@ Example:
 ```python
 PLUGINS_CONFIG = {
     "netmapper": {
+        "CREDENTIAL_FERNET_KEY": "replace-with-a-fernet-key-from-python-cryptography",
         "NTC_TEMPLATES_DIR": "/opt/ntc-templates/ntc_templates/templates",
         "NMAP_EXECUTABLE": "nmap",
         "SNMPGET_EXECUTABLE": "snmpget",
@@ -357,6 +359,12 @@ PLUGINS_CONFIG = {
     }
 }
 ```
+
+Credential security notes:
+
+- NetMapper now supports a dedicated `CREDENTIAL_FERNET_KEY` so stored discovery and SNMP secrets do not have to rely solely on NetBox's Django `SECRET_KEY`.
+- If `CREDENTIAL_FERNET_KEY` is not set, NetMapper keeps the legacy behavior for backward compatibility.
+- Existing encrypted values remain readable because NetMapper falls back to the legacy `SECRET_KEY`-derived key during decryption.
 
 ## How to Use NetMapper
 

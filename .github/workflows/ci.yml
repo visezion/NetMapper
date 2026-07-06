@@ -11,8 +11,8 @@
 
 name: "CI"
 env:
-  NETBOX_VERSION: v3.5.8
-  PYTHON_VERSION: v3.10
+  NETBOX_VERSION: v4.6.4
+  PYTHON_VERSION: v3.12
 concurrency:
   # Cancel any existing runs of this workflow for this same PR
   group: "${{ github.workflow }}-${{ github.ref }}"
