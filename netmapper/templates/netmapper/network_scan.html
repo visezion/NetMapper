@@ -18,8 +18,15 @@ __license__ = "GPLv3"
                     <div class="card-body">
                         <p class="text-muted">
                             Scan IPs, CIDRs, or explicit ranges with Nmap, optionally enrich responsive hosts
-                            with a stored SNMP credential, and create or update NetMapper discoverables.
+                            with a stored SNMP credential, create or update NetMapper discoverables, and,
+                            when <strong>Discover Now</strong> is enabled, immediately queue the normal
+                            NetMapper discovery and ingest workflow.
                         </p>
+                        <div class="alert alert-info">
+                            Preview validates targets only. Dry Run performs Nmap and optional SNMP checks
+                            without creating or updating discoverables. Start Scan saves the scan record and
+                            can queue full device discovery.
+                        </div>
                         {% render_form form %}
                         {% if preview_error %}
                             <div class="alert alert-danger mt-3 mb-0">{{ preview_error }}</div>
@@ -83,7 +90,8 @@ __license__ = "GPLv3"
                                                 <th>Address</th>
                                                 <th>Hostname</th>
                                                 <th>Vendor</th>
-                                                <th>Mode</th>
+                                                <th>Selected Mode</th>
+                                                <th>Inferred Mode</th>
                                                 <th>SNMP</th>
                                             </tr>
                                         </thead>
@@ -94,6 +102,7 @@ __license__ = "GPLv3"
                                                     <td>{{ row.hostname|default:"-" }}</td>
                                                     <td>{{ row.vendor|default:"-" }}</td>
                                                     <td>{{ row.selected_mode }}</td>
+                                                    <td>{{ row.inferred_mode|default:"-" }}</td>
                                                     <td>{% if row.snmp.error %}{{ row.snmp.error }}{% elif row.snmp.sys_name %}{{ row.snmp.sys_name }}{% else %}-{% endif %}</td>
                                                 </tr>
                                             {% endfor %}

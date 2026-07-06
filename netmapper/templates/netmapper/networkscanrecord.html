@@ -27,6 +27,7 @@ __license__ = "GPLv3"
                         <tr><th scope="row">Updated</th><td>{{ object.updated_count }}</td></tr>
                         <tr><th scope="row">Reused</th><td>{{ object.reused_count }}</td></tr>
                         <tr><th scope="row">SNMP Failures</th><td>{{ object.snmp_failures_count }}</td></tr>
+                        <tr><th scope="row">Queued Discovery Count</th><td>{{ object.summary.queued_discovery_count|default:"0" }}</td></tr>
                         <tr><th scope="row">Job ID</th><td>{{ object.job_id|default:"-" }}</td></tr>
                         <tr><th scope="row">Started</th><td>{{ object.started_at|default:"-" }}</td></tr>
                         <tr><th scope="row">Finished</th><td>{{ object.finished_at|default:"-" }}</td></tr>
@@ -69,7 +70,8 @@ __license__ = "GPLv3"
                                 <th>Address</th>
                                 <th>Hostname</th>
                                 <th>Vendor</th>
-                                <th>Mode</th>
+                                <th>Selected Mode</th>
+                                <th>Inferred Mode</th>
                                 <th>SNMP</th>
                             </tr>
                         </thead>
@@ -80,11 +82,12 @@ __license__ = "GPLv3"
                                     <td>{{ row.hostname|default:"-" }}</td>
                                     <td>{{ row.vendor|default:"-" }}</td>
                                     <td>{{ row.selected_mode }}</td>
+                                    <td>{{ row.inferred_mode|default:"-" }}</td>
                                     <td>{% if row.snmp.error %}{{ row.snmp.error }}{% elif row.snmp.sys_name %}{{ row.snmp.sys_name }}{% else %}-{% endif %}</td>
                                 </tr>
                             {% empty %}
                                 <tr>
-                                    <td colspan="5" class="text-muted">No result rows recorded.</td>
+                                    <td colspan="6" class="text-muted">No result rows recorded.</td>
                                 </tr>
                             {% endfor %}
                         </tbody>

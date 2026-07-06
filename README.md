@@ -111,11 +111,14 @@ At a high level, NetMapper works in four layers:
 There is also a separate subnet/range scanning path:
 
 1. The `Network Scan` page or `Scan subnet or range` job accepts IPs, CIDRs, or ranges.
-2. `nmap` finds responsive hosts.
-3. Optional SNMP probes collect `sysName`, `sysDescr`, and `sysObjectID`.
-4. NetMapper selects an inferred or fallback mode.
-5. `Discoverable` records are created or updated.
-6. The normal discovery workflow can be queued automatically.
+2. `nmap` finds responsive hosts in the requested subnet or IP range.
+3. Optional SNMP probes check reachable hosts and collect `sysName`, `sysDescr`, and `sysObjectID`.
+4. NetMapper uses Nmap and SNMP identity data to infer the best available discovery platform or falls back to the selected default mode.
+5. `Discoverable` records are created or updated with the selected discovery mode and attached credentials.
+6. NetMapper queues the standard SSH discovery workflow for those discoverables.
+7. Nornir and Netmiko connect to the device and run the platform command set.
+8. TextFSM and NTC templates parse supported command output.
+9. Ingestors create or update NetBox objects such as devices, interfaces, IP addresses, VLANs, neighbors, and cables when the collected data supports those relationships.
 
 ## Repository Layout
 
@@ -388,7 +391,8 @@ For subnet/range discovery:
 5. Run `Preview` or `Dry Run`.
 6. Run the actual scan.
 7. Review `Scan History`.
-8. Launch or verify queued discovery for the resulting discoverables.
+8. Confirm the queued discovery job completes for the resulting discoverables.
+9. Review the created or updated devices, interfaces, IP addresses, VLANs, neighbors, and topology data in NetBox.
 
 ## UI Guide
 
@@ -444,7 +448,29 @@ Subnet/range discovery uses:
 - optional SNMP enrichment
 - `NetworkScanRecord`
 
-Capabilities:
+Execution flow:
+
+1. `nmap` scans the requested subnet, CIDR, or IP range for responsive hosts.
+2. NetMapper optionally tests SNMP against those hosts to gather identity details.
+3. The plugin infers the best discovery mode from SNMP and Nmap identity data.
+4. `Discoverable` records are created or updated for each responsive host.
+5. The normal `Discover` workflow is queued automatically unless disabled.
+6. Nornir and Netmiko connect over SSH or the protocol defined by the discovery mode.
+7. Platform-specific discoverers run show commands.
+8. TextFSM and NTC templates parse supported output into structured data.
+9. Ingestors write the parsed data into NetBox models.
+
+Resulting NetBox updates can include:
+
+- devices
+- interfaces
+- IP addresses
+- VLANs
+- ARP and MAC tables
+- LLDP or CDP neighbor relationships
+- cable links when the parsed topology data is sufficient
+
+Capabilities around this workflow:
 
 - preview normalized targets
 - dry-run scan execution

@@ -266,8 +266,9 @@ class ScanNetwork(Script):
 
         name = "Scan subnet or range"
         description = (
-            "Use Nmap to find live hosts in subnets/ranges, optionally infer the "
-            "platform with SNMP, create discoverables, and queue discovery."
+            "Use Nmap to find live hosts, enrich them with SNMP identity, create "
+            "or update discoverables, and queue the full NetMapper discovery and "
+            "ingest workflow."
         )
         commit_default = True
 
