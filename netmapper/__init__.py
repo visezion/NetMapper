@@ -131,7 +131,7 @@ class NetmapperConfig(PluginConfig):
         "physical connections, and bring discovered infrastructure into NetBox "
         "with structured discovery workflows."
     )
-    version = "0.1.0"
+    version = "1.0.0"
     author = "Victor Ayodeji Oluwasusi"
     author_email = "oluwasusiv@gmail.com"
     base_url = "netmapper"

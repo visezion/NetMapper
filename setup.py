@@ -9,11 +9,11 @@ Make it available on PIP with:
     twine upload dist/*
 """
 
-__author__ = "Andrea Dainese"
+__author__ = "Victor Ayodeji Oluwasusi"
 __contact__ = "oluwasusiv@gmail.com"
-__copyright__ = "Copyright 2022, Andrea Dainese"
+__copyright__ = "Copyright 2026, Victor Ayodeji Oluwasusi"
 __license__ = "GPLv3"
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 
 from pathlib import Path
 
