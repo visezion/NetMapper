@@ -42,14 +42,18 @@ What the script does:
 - fetches and fast-forwards this repository
 - builds a fresh NetBox image with NetMapper installed
 - installs `git`, `nmap`, `snmp`, and `ntc-templates`
+- links the NetMapper compose override into the `netbox-docker` directory
 - recreates NetBox and worker containers
 - waits for container health checks
 - runs NetMapper asset synchronization
+- prints progress messages while NetBox and the worker are still starting
 
 Notes:
 
 - the first startup on a fresh database can take several minutes while NetBox applies migrations and builds its initial cache
 - this repository overrides the upstream NetBox healthcheck to allow slower first responses on small lab or VM hosts
+- the deploy script creates `netbox-docker/docker-compose.override.yml` as a symlink to NetMapper's override file so future `docker compose up -d` runs continue to use the plugin image
+- by default the build now reuses Docker cache for faster repeat deployments; set `BUILD_NO_CACHE=1` when you need a full clean rebuild
 
 ## 4. Verify the containers are running
 
@@ -62,6 +66,13 @@ If you want Docker to keep the stack running after reboot, apply a restart polic
 
 ```bash
 docker update --restart unless-stopped $(docker ps -aq)
+```
+
+After that, a normal restart from the `netbox-docker` directory will keep using the NetMapper-enabled image:
+
+```bash
+cd ~/netbox-lab/netbox-docker
+docker compose up -d
 ```
 
 ## 5. Deploy when your paths differ
@@ -77,6 +88,12 @@ NETMAPPER_PATH=/path/to/NetMapper \
 
 ```bash
 ALLOW_DIRTY=1 ./scripts/deploy_netbox_docker.sh main
+```
+
+## 7. Force a full clean rebuild when needed
+
+```bash
+BUILD_NO_CACHE=1 ./scripts/deploy_netbox_docker.sh main
 ```
 
 ## Best full command sequence

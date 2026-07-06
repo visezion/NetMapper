@@ -9,6 +9,44 @@ which nmap
 which snmpget
 ```
 
+## NetBox is running but the browser cannot open it
+
+If the containers are healthy but you cannot open NetBox in the browser, make sure the host port is published.
+
+Create or edit the override file:
+
+```bash
+nano docker-compose.override.yml
+```
+
+Put this inside:
+
+```yaml
+services:
+  netbox:
+    ports:
+      - "8000:8080"
+```
+
+Save the file:
+
+- `CTRL + O`
+- `ENTER`
+- `CTRL + X`
+
+Then restart the stack:
+
+```bash
+docker compose down
+docker compose up -d
+```
+
+After that, open:
+
+```text
+http://SERVER_IP:8000
+```
+
 ## Cisco IOS enable mode failures
 
 If enable mode fails, verify that the `Credential` includes the correct `enable_password`.
