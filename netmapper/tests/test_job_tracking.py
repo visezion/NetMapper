@@ -5,7 +5,7 @@ from datetime import timedelta
 from django.test import SimpleTestCase
 from django.utils import timezone
 
-from netmapper.job_tracking import evaluate_scan_job_health
+from netmapper.job_tracking import evaluate_scan_job_health, normalize_job_uuid
 from netmapper.models import NetworkScanStatusChoices
 
 
@@ -67,3 +67,19 @@ class ScanJobHealthTest(SimpleTestCase):
 
         self.assertTrue(health.should_mark_failed)
         self.assertIn("does not have a background job ID", health.error_message)
+
+    def test_marks_invalid_legacy_job_id_as_failed(self):
+        """A malformed non-UUID job ID should not crash reconciliation."""
+        health = evaluate_scan_job_health(
+            record_status=NetworkScanStatusChoices.RUNNING,
+            job_id="3",
+            started_at=timezone.now() - timedelta(minutes=5),
+            queue_name="default",
+        )
+
+        self.assertTrue(health.should_mark_failed)
+        self.assertIn("invalid background job ID", health.error_message)
+
+    def test_normalize_job_uuid_rejects_legacy_numeric_ids(self):
+        """Legacy numeric job IDs should be treated as invalid UUIDs."""
+        self.assertIsNone(normalize_job_uuid("3"))

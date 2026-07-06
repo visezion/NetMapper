@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import timedelta
+from uuid import UUID
 
 from django.utils import timezone
 
@@ -52,6 +53,25 @@ def build_missing_job_id_error():
     )
 
 
+def build_invalid_job_id_error(job_id):
+    """Return a troubleshooting message for legacy or malformed job IDs."""
+    return (
+        f"This scan record references an invalid background job ID ({job_id!r}). "
+        "It was likely created by an older plugin version or a failed queue submission. "
+        "Re-run the scan to create a new job record."
+    )
+
+
+def normalize_job_uuid(job_id):
+    """Return a canonical UUID string or None when the stored job ID is invalid."""
+    if not job_id:
+        return None
+    try:
+        return str(UUID(str(job_id)))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
 def evaluate_scan_job_health(
     *,
     record_status,
@@ -95,6 +115,18 @@ def evaluate_scan_job_health(
             )
 
         error_message = build_missing_job_id_error()
+        return ScanJobHealth(
+            core_status=core_status,
+            queue_status=queue_status,
+            queue_name=queue_name,
+            should_mark_failed=True,
+            error_message=error_message,
+            detail_message=error_message,
+        )
+
+    normalized_job_id = normalize_job_uuid(job_id)
+    if normalized_job_id is None:
+        error_message = build_invalid_job_id_error(job_id)
         return ScanJobHealth(
             core_status=core_status,
             queue_status=queue_status,
@@ -183,9 +215,12 @@ def evaluate_scan_job_health(
 
 def inspect_queue_job(job_id, queue_name):
     """Return the current RQ status for the given job UUID."""
+    normalized_job_id = normalize_job_uuid(job_id)
+    if normalized_job_id is None:
+        return "invalid"
     queue = django_rq.get_queue(queue_name or "default")
     try:
-        job = RQJob.fetch(str(job_id), connection=queue.connection)
+        job = RQJob.fetch(normalized_job_id, connection=queue.connection)
     except NoSuchJobError:
         return "missing"
     return (job.get_status(refresh=False) or "").lower() or None
@@ -230,14 +265,17 @@ def reconcile_scan_record_job(scan_record, stale_after_seconds=60):
     core_status = None
     core_error = ""
     queue_status = None
+    normalized_job_id = normalize_job_uuid(scan_record.job_id)
 
-    if scan_record.job_id:
-        core_job = core_job or CoreJob.objects.filter(job_id=scan_record.job_id).first()
+    if normalized_job_id:
+        core_job = core_job or CoreJob.objects.filter(job_id=normalized_job_id).first()
         if core_job:
             queue_name = core_job.queue_name or queue_name
             core_status = core_job.status
             core_error = core_job.error or ""
-        queue_status = inspect_queue_job(scan_record.job_id, queue_name)
+        queue_status = inspect_queue_job(normalized_job_id, queue_name)
+    elif scan_record.job_id:
+        queue_status = "invalid"
 
     health = evaluate_scan_job_health(
         record_status=scan_record.status,
