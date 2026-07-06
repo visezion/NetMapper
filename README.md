@@ -9,7 +9,6 @@ This repository is maintained as the `visezion/NetMapper` fork and is currently 
 - NetBox `4.6.4`
 - `netbox-docker` `5.0.1`
 - plugin package name `netmapper`
-- maintained by Victor Ayodeji Oluwasusi
 
 ## Quick Links
 
