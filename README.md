@@ -33,7 +33,7 @@ This repository is maintained as the `visezion/NetMapper` fork and is currently 
 
 ## Quick Start
 
-For Docker deployment on Ubuntu:
+For Docker deployment on Ubuntu, NetMapper is pinned to NetBox `4.6.4` by default and supported for NetBox `4.6.x`:
 
 ```bash
 sudo apt update && sudo apt upgrade -y
@@ -46,11 +46,20 @@ newgrp docker
 
 mkdir -p ~/netbox-lab
 cd ~/netbox-lab
-git clone https://github.com/netbox-community/netbox-docker.git
-git clone https://github.com/visezion/NetMapper.git
+git clone --branch 5.0.1 --depth 1 https://github.com/netbox-community/netbox-docker.git
+git clone --branch main --depth 1 https://github.com/visezion/NetMapper.git
 
 cd ~/netbox-lab/NetMapper
 ./scripts/deploy_netbox_docker.sh main
 ```
 
-For the full Docker guide, see [Install with netbox-docker](docs/install-docker.md).
+What this gives you:
+
+- NetBox `4.6.4`
+- `netbox-docker` `5.0.1`
+- NetMapper from the current `main` branch
+- `netbox-docker` with the NetMapper plugin image
+- `nmap`, `snmp`, and `ntc-templates` installed inside the plugin build
+- a repeatable deploy path from GitHub without editing code
+
+For the full Docker guide, see [Install with netbox-docker](docs/install-docker.md). For a non-Docker deployment, see [Install into an Existing NetBox Instance](docs/install-standard.md).

@@ -2,6 +2,11 @@
 
 This is the easiest supported deployment path.
 
+Supported target:
+
+- NetBox `4.6.x`
+- default pinned image: `netboxcommunity/netbox:v4.6.4`
+
 ## 1. Prepare the server
 
 ```bash
@@ -19,9 +24,16 @@ newgrp docker
 ```bash
 mkdir -p ~/netbox-lab
 cd ~/netbox-lab
-git clone https://github.com/netbox-community/netbox-docker.git
-git clone https://github.com/visezion/NetMapper.git
+git clone --branch 5.0.1 --depth 1 https://github.com/netbox-community/netbox-docker.git
+git clone --branch main --depth 1 https://github.com/visezion/NetMapper.git
 ```
+
+Why this is pinned:
+
+- without `--branch`, Git clones the current default branch, which can change over time
+- these commands pin `netbox-docker` to the tested `5.0.1` release
+- NetMapper is intentionally cloned from `main` because the deploy script is designed to track a branch and update from GitHub before each build
+- this keeps first-time installs reproducible
 
 Expected layout:
 
@@ -41,6 +53,7 @@ What the script does:
 
 - fetches and fast-forwards this repository
 - builds a fresh NetBox image with NetMapper installed
+- uses the pinned NetBox base image `v4.6.4` unless you deliberately override it
 - installs `git`, `nmap`, `snmp`, and `ntc-templates`
 - links the NetMapper compose override into the `netbox-docker` directory
 - recreates NetBox and worker containers
@@ -96,6 +109,17 @@ ALLOW_DIRTY=1 ./scripts/deploy_netbox_docker.sh main
 BUILD_NO_CACHE=1 ./scripts/deploy_netbox_docker.sh main
 ```
 
+## 8. Override the NetBox image version only if you mean to test another 4.6 release
+
+The plugin is intended for NetBox `4.6.x`. The Docker build defaults to `4.6.4`.
+
+```bash
+cd ~/netbox-lab/NetMapper
+docker compose build --build-arg NETBOX_VERSION=v4.6.4
+```
+
+If you change the version, stay within the supported `4.6.x` range unless you are doing development validation.
+
 ## Best full command sequence
 
 For a beginner-friendly end-to-end setup on a new Ubuntu host:
@@ -111,8 +135,8 @@ newgrp docker
 
 mkdir -p ~/netbox-lab
 cd ~/netbox-lab
-git clone https://github.com/netbox-community/netbox-docker.git
-git clone https://github.com/visezion/NetMapper.git
+git clone --branch 5.0.1 --depth 1 https://github.com/netbox-community/netbox-docker.git
+git clone --branch main --depth 1 https://github.com/visezion/NetMapper.git
 
 cd ~/netbox-lab/NetMapper
 ./scripts/deploy_netbox_docker.sh main
