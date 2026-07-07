@@ -13,7 +13,8 @@ __author__ = "Victor Ayodeji Oluwasusi"
 __contact__ = "oluwasusiv@gmail.com"
 __copyright__ = "Copyright 2026, Victor Ayodeji Oluwasusi"
 __license__ = "GPLv3"
-__version__ = "1.0.0"
+__version__ = "0.1.0"
+NETBOX_COMPATIBILITY = "NetBox 4.6.x"
 
 from pathlib import Path
 
@@ -57,7 +58,15 @@ setup(
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3 :: Only",
     ],
+    keywords=[
+        "netbox",
+        "netbox-plugin",
+        "network-discovery",
+        "topology-mapping",
+        "netbox-4.6",
+    ],
     project_urls={
+        "NetBox Compatibility": "https://github.com/visezion/NetMapper#netmapper-for-netbox-46x",
         "Documentation": "https://github.com/visezion/NetMapper#readme",
         "Issues": "https://github.com/visezion/NetMapper/issues",
         "Version History": "https://github.com/visezion/NetMapper/commits/main",

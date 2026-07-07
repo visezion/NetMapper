@@ -1,5 +1,10 @@
 # Install into an Existing NetBox Instance
 
+Supported target:
+
+- NetBox `4.6.x`
+- validated in this repository against NetBox `4.6.4`
+
 ## 1. Install system tools
 
 ```bash
@@ -10,7 +15,7 @@ sudo apt-get install -y git nmap snmp
 ## 2. Clone the repository
 
 ```bash
-git clone https://github.com/visezion/NetMapper.git
+git clone --branch main --depth 1 https://github.com/visezion/NetMapper.git
 cd NetMapper
 ```
 
@@ -19,6 +24,8 @@ cd NetMapper
 ```bash
 python3 -m pip install .
 ```
+
+If you manage NetBox dependencies with pinned requirements, keep this plugin on a NetBox `4.6.x` host.
 
 ## 4. Install or expose `ntc-templates`
 
