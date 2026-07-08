@@ -16,6 +16,8 @@ concurrency:
 on:  # yamllint disable-line rule:truthy
   pull_request:
     types: [closed]
+permissions:
+  contents: write
 jobs:
   release:
     # Run only if the PR has been merged
