@@ -9,19 +9,19 @@ export NETMAPPER_PATH="${NETMAPPER_PATH:-${NETDOC_PATH:-$REPO_ROOT}}"
 INSTALL_LOCAL_OVERRIDE="${INSTALL_LOCAL_OVERRIDE:-1}"
 BUILD_NO_CACHE="${BUILD_NO_CACHE:-0}"
 PULL_BASE_IMAGES="${PULL_BASE_IMAGES:-1}"
-BRANCH="${1:-}"
+TARGET_REF="${1:-}"
 ALLOW_DIRTY="${ALLOW_DIRTY:-0}"
 NETBOX_STARTUP_TIMEOUT="${NETBOX_STARTUP_TIMEOUT:-600}"
 NETBOX_WORKER_STARTUP_TIMEOUT="${NETBOX_WORKER_STARTUP_TIMEOUT:-180}"
 
 cd "$REPO_ROOT"
 
-CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-TARGET_BRANCH="${BRANCH:-$CURRENT_BRANCH}"
+CURRENT_BRANCH="$(git symbolic-ref --quiet --short HEAD || true)"
+TARGET_REF="${TARGET_REF:-$CURRENT_BRANCH}"
 CURRENT_COMMIT="$(git rev-parse HEAD)"
 
 echo "Repository: $REPO_ROOT"
-echo "Branch: $TARGET_BRANCH"
+echo "Target ref: ${TARGET_REF:-<current detached HEAD>}"
 echo "Current commit: $CURRENT_COMMIT"
 echo "NetBox Docker directory: $NETBOX_DOCKER_DIR"
 echo "Compose override: $OVERRIDE_FILE"
@@ -102,11 +102,15 @@ fi
 
 git fetch --all --prune
 
-if [ "$CURRENT_BRANCH" != "$TARGET_BRANCH" ]; then
-    git checkout "$TARGET_BRANCH"
+if [ -n "$TARGET_REF" ] && [ "$CURRENT_BRANCH" != "$TARGET_REF" ]; then
+    git checkout "$TARGET_REF"
 fi
 
-git pull --ff-only
+if git symbolic-ref -q HEAD >/dev/null; then
+    git pull --ff-only
+else
+    echo "Detached HEAD detected (tag or commit checkout); skipping git pull."
+fi
 
 UPDATED_COMMIT="$(git rev-parse HEAD)"
 SHORT_COMMIT="$(git rev-parse --short=12 HEAD)"
