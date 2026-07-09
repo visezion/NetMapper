@@ -21,7 +21,7 @@ credential_buttons = [
 
 snmpcredential_buttons = [
     PluginMenuButton(
-        link="plugins:netmapper:snmpcredential_add",
+        link="plugins:netmapper:snmpcredential-add",
         title="Add",
         icon_class="mdi mdi-plus-thick",
     ),
@@ -69,7 +69,7 @@ menu_discovery = (
         permissions=["netmapper.view_credential"],
     ),
     PluginMenuItem(
-        link="plugins:netmapper:snmpcredential_list",
+        link="plugins:netmapper:snmpcredential-list",
         link_text="SNMP Credentials",
         buttons=snmpcredential_buttons,
         permissions=["netmapper.view_snmpcredential"],

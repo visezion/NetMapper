@@ -283,7 +283,7 @@ class SnmpCredentialDeleteView(generic.ObjectDeleteView):
     """Delete stored SNMP credential view."""
 
     queryset = models.SnmpCredential.objects.all()
-    default_return_url = "plugins:netmapper:snmpcredential_list"
+    default_return_url = "plugins:netmapper:snmpcredential-list"
 
 
 class NetworkScanView(PermissionRequiredMixin, FormView):

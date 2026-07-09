@@ -64,7 +64,17 @@ urlpatterns = (
     path(
         "snmp-credential/",
         views.SnmpCredentialListView.as_view(),
+        name="snmpcredential-list",
+    ),
+    path(
+        "snmp-credential/",
+        views.SnmpCredentialListView.as_view(),
         name="snmpcredential_list",
+    ),
+    path(
+        "snmp-credential/add/",
+        views.SnmpCredentialEditView.as_view(),
+        name="snmpcredential-add",
     ),
     path(
         "snmp-credential/add/",
@@ -79,7 +89,17 @@ urlpatterns = (
     path(
         "snmp-credential/<int:pk>/edit/",
         views.SnmpCredentialEditView.as_view(),
+        name="snmpcredential-edit",
+    ),
+    path(
+        "snmp-credential/<int:pk>/edit/",
+        views.SnmpCredentialEditView.as_view(),
         name="snmpcredential_edit",
+    ),
+    path(
+        "snmp-credential/<int:pk>/delete/",
+        views.SnmpCredentialDeleteView.as_view(),
+        name="snmpcredential-delete",
     ),
     path(
         "snmp-credential/<int:pk>/delete/",
@@ -89,7 +109,18 @@ urlpatterns = (
     path(
         "snmp-credential/<int:pk>/test/",
         views.SnmpCredentialTestView.as_view(),
+        name="snmpcredential-test",
+    ),
+    path(
+        "snmp-credential/<int:pk>/test/",
+        views.SnmpCredentialTestView.as_view(),
         name="snmpcredential_test",
+    ),
+    path(
+        "snmp-credential/<int:pk>/changelog/",
+        ObjectChangeLogView.as_view(),
+        name="snmpcredential-changelog",
+        kwargs={"model": models.SnmpCredential},
     ),
     path(
         "snmp-credential/<int:pk>/changelog/",
