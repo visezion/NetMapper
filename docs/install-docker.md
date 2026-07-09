@@ -2,6 +2,9 @@
 
 This is the easiest supported deployment path.
 
+For the full lifecycle guide, including upgrade and rollback flow, see
+[Installation and Updates](installation-and-updates.md).
+
 Supported target:
 
 - NetBox `4.6.x`
@@ -130,6 +133,23 @@ docker compose build --build-arg NETBOX_VERSION=v4.6.4
 ```
 
 If you change the version, stay within the supported `4.6.x` range unless you are doing development validation.
+
+## 9. Update an existing netbox-docker deployment
+
+Use the release tag you want to deploy:
+
+```bash
+cd ~/netbox-lab/NetMapper
+git fetch --tags
+git checkout <release-tag>
+./scripts/deploy_netbox_docker.sh <release-tag>
+```
+
+Before a production upgrade:
+
+- back up the NetBox database
+- read the relevant [Upgrade Notes](upgrade-notes.md)
+- verify `docker compose ps` and recent logs after the deploy
 
 ## Best full command sequence
 

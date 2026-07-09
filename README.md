@@ -16,6 +16,7 @@ This repository is maintained as the `visezion/NetMapper` fork and is currently 
 - [How NetMapper Works](docs/how-it-works.md)
 - [Repository Layout](docs/repository-layout.md)
 - [Requirements](docs/requirements.md)
+- [Installation and Updates](docs/installation-and-updates.md)
 - [Install with netbox-docker](docs/install-docker.md)
 - [Install into an Existing NetBox Instance](docs/install-standard.md)
 - [Configuration](docs/configuration.md)
@@ -66,4 +67,4 @@ What this gives you:
 
 Use `main` only for development or when you intentionally want unreleased changes.
 
-For the full Docker guide, see [Install with netbox-docker](docs/install-docker.md). For a non-Docker deployment, see [Install into an Existing NetBox Instance](docs/install-standard.md).
+For the full operator guide, see [Installation and Updates](docs/installation-and-updates.md). For a Docker-only walkthrough, see [Install with netbox-docker](docs/install-docker.md). For a non-Docker deployment, see [Install into an Existing NetBox Instance](docs/install-standard.md).

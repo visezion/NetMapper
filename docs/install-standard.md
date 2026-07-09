@@ -1,5 +1,8 @@
 # Install into an Existing NetBox Instance
 
+For the full lifecycle guide, including upgrade and rollback flow, see
+[Installation and Updates](installation-and-updates.md).
+
 Supported target:
 
 - NetBox `4.6.x`
@@ -68,3 +71,23 @@ python3 manage.py shell -c "from netmapper import sync_plugin_assets; sync_plugi
 ## 8. Restart NetBox services
 
 Restart your web server, background worker, and any process manager services used by your NetBox deployment.
+
+## 9. Update an existing NetBox installation
+
+Use the release tag you want to deploy:
+
+```bash
+cd /path/to/NetMapper
+git fetch --tags
+git checkout <release-tag>
+python3 -m pip install --upgrade .
+python3 manage.py migrate
+python3 manage.py collectstatic --no-input
+python3 manage.py shell -c "from netmapper import sync_plugin_assets; sync_plugin_assets()"
+```
+
+Before a production upgrade:
+
+- back up the NetBox database
+- read the relevant [Upgrade Notes](upgrade-notes.md)
+- restart the NetBox web and worker services after the update

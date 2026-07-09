@@ -1,5 +1,8 @@
 # Upgrade Notes
 
+Use this file for release-specific changes. For the main installation and
+upgrade workflow, see [Installation and Updates](installation-and-updates.md).
+
 ## NetMapper 1.0.1
 
 NetMapper `1.0.1` is a maintenance release for NetBox `4.6.x` focused on
