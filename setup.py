@@ -16,19 +16,10 @@ from pathlib import Path
 from setuptools import find_namespace_packages, setup
 
 README = Path(__file__).with_name("README.md").read_text(encoding="utf-8")
-VERSION_NS = {}
-exec(
-    Path(__file__).with_name("netmapper").joinpath("version.py").read_text(
-        encoding="utf-8"
-    ),
-    VERSION_NS,
-)
-PLUGIN_VERSION = VERSION_NS["PLUGIN_VERSION"]
-NETBOX_COMPATIBILITY = VERSION_NS["NETBOX_COMPATIBILITY"]
 
 setup(
     name="netmapper",
-    version=PLUGIN_VERSION,
+    use_scm_version=True,
     description=(
         "Auto-discover network devices, identify platforms, map links, and sync "
         "physical infrastructure into NetBox"
