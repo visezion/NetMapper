@@ -16,6 +16,7 @@ from netmapper.models import (
     ArpTableEntry,
     MacAddressTableEntry,
     Diagram,
+    SnmpCredential,
 )
 
 
@@ -48,6 +49,21 @@ class CredentialSerializer(NetBoxModelSerializer):
         model = Credential
         fields = "__all__"
         brief_fields = ("id", "url", "display", "name")
+
+
+class SnmpCredentialSerializer(NetBoxModelSerializer):
+    """Serializer to validate SnmpCredential data."""
+
+    url = serializers.HyperlinkedIdentityField(
+        view_name="plugins-api:netmapper-api:snmpcredential-detail"
+    )
+
+    class Meta:
+        """Serializer metadata."""
+
+        model = SnmpCredential
+        fields = "__all__"
+        brief_fields = ("id", "url", "display", "name", "version", "port")
 
 
 class DiagramSerializer(NetBoxModelSerializer):

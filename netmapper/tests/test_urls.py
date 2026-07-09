@@ -34,3 +34,10 @@ class PluginUrlCompatibilityTest(SimpleTestCase):
                     if "add" not in underscored_name
                     else reverse(f"plugins:netmapper:{underscored_name}"),
                 )
+
+    def test_snmpcredential_api_list_route_exists(self):
+        """The plugin API must expose SnmpCredential for script ObjectVar fields."""
+        self.assertEqual(
+            reverse("plugins-api:netmapper-api:snmpcredential-list"),
+            "/api/plugins/netmapper/snmpcredential/",
+        )

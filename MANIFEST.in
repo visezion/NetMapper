@@ -1,9 +1,3 @@
-recursive-include netdoc/api *
-recursive-include netdoc/jobs *
-recursive-include netdoc/library *
-recursive-include netdoc/ntc_templates *
-recursive-include netdoc/reports *
-recursive-include netdoc/scripts *
-recursive-include netdoc/static *
-recursive-include netdoc/templates *
-recursive-include netdoc/templatetags *
+include README.md
+include LICENSE
+global-exclude *.py[cod]
