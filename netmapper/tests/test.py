@@ -38,6 +38,7 @@ from netmapper.models import (
 )
 from netmapper.schemas import (
     credential as credential_api,
+    device as device_api,
     discoverable as discoverable_api,
     discoverylog as discoverylog_api,
 )
@@ -811,3 +812,24 @@ class QuestionModelTests(TestCase):
                     test_function = globals()[test_case]
                     test_function(self, expected_results)
                     print("done")
+
+
+class DeviceTypeSchemaTests(TestCase):
+    """Focused regression tests for DeviceType creation."""
+
+    def test_create_manufacturer_and_model_reuses_legacy_slug(self):
+        """Reuse existing device types created with the pre-library slug format."""
+        manufacturer_o = Manufacturer.objects.create(name="Cisco", slug="cisco")
+        existing_o = DeviceType.objects.create(
+            manufacturer=manufacturer_o,
+            model="WS-C2960-24TC-L",
+            slug="catalyst-2960-24tc-l",
+        )
+
+        devicetype_o = device_api.create_manufacturer_and_model(
+            manufacturer="Cisco",
+            model_keyword="WS-C2960-24TC-L",
+        )
+
+        self.assertEqual(devicetype_o.pk, existing_o.pk)
+        self.assertEqual(DeviceType.objects.count(), 1)
