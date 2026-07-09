@@ -25,15 +25,16 @@ newgrp docker
 mkdir -p ~/netbox-lab
 cd ~/netbox-lab
 git clone --branch 5.0.1 --depth 1 https://github.com/netbox-community/netbox-docker.git
-git clone --branch main --depth 1 https://github.com/visezion/NetMapper.git
+git clone https://github.com/visezion/NetMapper.git
 ```
 
 Why this is pinned:
 
 - without `--branch`, Git clones the current default branch, which can change over time
 - these commands pin `netbox-docker` to the tested `5.0.1` release
-- NetMapper is intentionally cloned from `main` because the deploy script is designed to track a branch and update from GitHub before each build
-- this keeps first-time installs reproducible
+- cloning the full NetMapper repository lets you choose either a stable release tag or `main`
+- stable production installs should deploy a GitHub release tag, for example `v1.0.2`
+- `main` is better reserved for development validation
 
 Expected layout:
 
@@ -43,6 +44,16 @@ Expected layout:
 ```
 
 ## 3. Deploy NetBox with NetMapper
+
+Recommended stable deployment:
+
+```bash
+cd ~/netbox-lab/NetMapper
+git checkout <release-tag>  # for example: v1.0.2
+./scripts/deploy_netbox_docker.sh <release-tag>
+```
+
+Development deployment from the current branch:
 
 ```bash
 cd ~/netbox-lab/NetMapper
@@ -94,7 +105,7 @@ docker compose up -d
 cd /path/to/NetMapper
 NETBOX_DOCKER_DIR=/path/to/netbox-docker \
 NETMAPPER_PATH=/path/to/NetMapper \
-./scripts/deploy_netbox_docker.sh main
+./scripts/deploy_netbox_docker.sh <release-tag>
 ```
 
 ## 6. Deploy from a dirty tree for development only
@@ -136,10 +147,11 @@ newgrp docker
 mkdir -p ~/netbox-lab
 cd ~/netbox-lab
 git clone --branch 5.0.1 --depth 1 https://github.com/netbox-community/netbox-docker.git
-git clone --branch main --depth 1 https://github.com/visezion/NetMapper.git
+git clone https://github.com/visezion/NetMapper.git
 
 cd ~/netbox-lab/NetMapper
-./scripts/deploy_netbox_docker.sh main
+git checkout <release-tag>  # for example: v1.0.2
+./scripts/deploy_netbox_docker.sh <release-tag>
 
 cd ~/netbox-lab/netbox-docker
 docker compose ps

@@ -15,9 +15,12 @@ sudo apt-get install -y git nmap snmp
 ## 2. Clone the repository
 
 ```bash
-git clone --branch main --depth 1 https://github.com/visezion/NetMapper.git
+git clone https://github.com/visezion/NetMapper.git
 cd NetMapper
+git checkout <release-tag>  # for example: v1.0.2
 ```
+
+Use `main` only when you intentionally want unreleased development changes.
 
 ## 3. Install the plugin package
 

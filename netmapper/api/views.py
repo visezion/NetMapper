@@ -15,6 +15,7 @@ from netmapper.api.serializers import (
     DiagramSerializer,
     MacAddressTableEntrySerializer,
     RouteTableEntrySerializer,
+    SnmpCredentialSerializer,
 )
 
 
@@ -24,6 +25,14 @@ class CredentialViewSet(NetBoxModelViewSet):
     queryset = models.Credential.objects.prefetch_related("tags")
     serializer_class = CredentialSerializer
     filterset_class = filtersets.CredentialFilterSet
+
+
+class SnmpCredentialViewSet(NetBoxModelViewSet):
+    """API view for add/edit SnmpCredential."""
+
+    queryset = models.SnmpCredential.objects.prefetch_related("tags")
+    serializer_class = SnmpCredentialSerializer
+    filterset_class = filtersets.SnmpCredentialFilterSet
 
 
 class ArpTableEntryViewSet(NetBoxModelViewSet):

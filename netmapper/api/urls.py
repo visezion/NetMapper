@@ -13,6 +13,7 @@ app_name = "netmapper-api"  # pylint: disable=invalid-name
 router = NetBoxRouter()
 router.register("arptableentry", views.ArpTableEntryViewSet)
 router.register("credential", views.CredentialViewSet)
+router.register("snmpcredential", views.SnmpCredentialViewSet)
 router.register("diagram", views.DiagramViewSet)
 router.register("discoverylog", views.DiscoveryLogViewSet)
 router.register("discoverable", views.DiscoverableViewSet)

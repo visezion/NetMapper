@@ -50,14 +50,17 @@ Upgrade to `1.0.1` to avoid:
 ```bash
 cd ~/netbox-lab/NetMapper
 git fetch --tags
-git checkout v1.0.1
-./scripts/deploy_netbox_docker.sh v1.0.1
+git checkout <release-tag>  # for example: v1.0.1
+./scripts/deploy_netbox_docker.sh <release-tag>
 ```
+
+For future releases, replace `v1.0.1` with the tag you are deploying. Stable
+production upgrades should use a GitHub release tag rather than `main`.
 
 Use `ALLOW_DIRTY=1` only if you intentionally have local uncommitted changes:
 
 ```bash
-ALLOW_DIRTY=1 ./scripts/deploy_netbox_docker.sh v1.0.1
+ALLOW_DIRTY=1 ./scripts/deploy_netbox_docker.sh <release-tag>
 ```
 
 #### Standard NetBox installation
@@ -65,7 +68,7 @@ ALLOW_DIRTY=1 ./scripts/deploy_netbox_docker.sh v1.0.1
 ```bash
 cd /path/to/NetMapper
 git fetch --tags
-git checkout v1.0.1
+git checkout <release-tag>
 python3 -m pip install --upgrade .
 python3 manage.py migrate
 python3 manage.py collectstatic --no-input

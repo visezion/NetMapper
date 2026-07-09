@@ -12,8 +12,10 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db.models.signals import post_migrate
 
 from netbox.plugins import PluginConfig
+from netmapper.version import PLUGIN_VERSION
 
 MODULE_PATH = os.path.dirname(__file__)
+__version__ = PLUGIN_VERSION
 
 
 def get_plugin_settings():
@@ -131,7 +133,7 @@ class NetmapperConfig(PluginConfig):
         "physical connections, and bring discovered infrastructure into NetBox "
         "with structured discovery workflows."
     )
-    version = "1.0.0"
+    version = PLUGIN_VERSION
     author = "Victor Ayodeji Oluwasusi"
     author_email = "oluwasusiv@gmail.com"
     base_url = "netmapper"
