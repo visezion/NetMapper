@@ -434,7 +434,9 @@ class NetworkScanView(PermissionRequiredMixin, FormView):
             record.started_at = timezone.now()
             record.finished_at = timezone.now()
             record.responsive_hosts_count = len(candidates)
-            record.snmp_failures_count = len([candidate for candidate in candidates if candidate.snmp_failed])
+            record.snmp_failures_count = len(
+                [candidate for candidate in candidates if candidate.snmp_failed]
+            )
             record.summary = {
                 "preview_only": True,
                 "current_stage": "completed",
@@ -444,7 +446,9 @@ class NetworkScanView(PermissionRequiredMixin, FormView):
                 "responsive_hosts_count": record.responsive_hosts_count,
                 "snmp_failures_count": record.snmp_failures_count,
             }
-            record.results = [candidate_to_summary(candidate) for candidate in candidates]
+            record.results = [
+                candidate_to_summary(candidate) for candidate in candidates
+            ]
             record.save()
             messages.success(
                 request,
@@ -465,7 +469,9 @@ class NetworkScanView(PermissionRequiredMixin, FormView):
         post_data["scan_record_id"] = record.pk
 
         try:
-            job_id = utils.spawn_script("ScanNetwork", user=self.request.user, post_data=post_data)
+            job_id = utils.spawn_script(
+                "ScanNetwork", user=self.request.user, post_data=post_data
+            )
         except Exception as exc:  # pylint: disable=broad-except
             form.add_error(None, str(exc))
             return self.form_invalid(form)
@@ -651,7 +657,9 @@ class DiscoverableListView(generic.ObjectListView):
     def get_extra_context(self, request):
         """Expose action names for the custom bulk action template override."""
         return {
-            "action_names": {action.name for action in self.get_permitted_actions(request.user)}
+            "action_names": {
+                action.name for action in self.get_permitted_actions(request.user)
+            }
         }
 
 

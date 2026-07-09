@@ -54,7 +54,7 @@ jobs:
       - name: "Install requirements"
         run: "pip install -r netbox/requirements.txt"
       - name: "Install NetMapper dependencies"
-        run: "pip install netmapper && pip uninstall -y netmapper"
+        run: "pip install ./netmapper && pip uninstall -y netmapper"
       - name: "Install PyLint"
         run: "pip install pylint==2.17.7"
       - name: "Run Pylint"
