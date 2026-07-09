@@ -13,6 +13,9 @@ stability, compatibility, and upgrade safety.
   forms no longer fail with `NoReverseMatch` for `snmpcredential-list`.
 - Fixed internal SNMP credential navigation and action links to use the
   NetBox-compatible route names.
+- Fixed `netbox-docker` deployments from a Git tag or detached HEAD. The
+  deploy script now skips `git pull` automatically when deploying a tagged
+  release such as `v1.0.1`.
 - Fixed CI pipeline issues:
   - formatting failures in `views.py`
   - the `pylint` workflow trying to install `netmapper` from PyPI instead of
@@ -24,6 +27,8 @@ stability, compatibility, and upgrade safety.
   matching.
 - Added regression coverage for SNMP credential URL compatibility between
   hyphenated and underscored route names.
+- Improved the Docker deployment flow so branch-based deployments still
+  fast-forward normally while tag-based deployments work without special flags.
 
 ### Compatibility
 
@@ -36,6 +41,7 @@ Upgrade to `1.0.1` to avoid:
 
 - SNMP credential page and script reverse URL errors
 - inventory ingest failures caused by duplicate `DeviceType` slug conflicts
+- deployment failures caused by `git pull` running on a tag checkout
 
 ### Upgrade Steps
 
@@ -46,6 +52,12 @@ cd ~/netbox-lab/NetMapper
 git fetch --tags
 git checkout v1.0.1
 ./scripts/deploy_netbox_docker.sh v1.0.1
+```
+
+Use `ALLOW_DIRTY=1` only if you intentionally have local uncommitted changes:
+
+```bash
+ALLOW_DIRTY=1 ./scripts/deploy_netbox_docker.sh v1.0.1
 ```
 
 #### Standard NetBox installation
