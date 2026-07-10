@@ -101,20 +101,17 @@ def create(manufacturer=None, manufacturer_keyword=None, model_keyword=None, **k
     if not manufacturer:
         manufacturer = "Unknown"
 
-    model_o = create_manufacturer_and_model(
-        manufacturer=manufacturer, model_keyword=model_keyword
-    )
+    if "device_type_id" not in kwargs:
+        model_o = create_manufacturer_and_model(
+            manufacturer=manufacturer, model_keyword=model_keyword
+        )
+        kwargs["device_type_id"] = model_o.id
 
-    devicerole_o = devicerole.get(name="Unknown")
-    if not devicerole_o:
-        devicerole_o = devicerole.create(name="Unknown")
-
-    kwargs.update(
-        {
-            "role_id": devicerole_o.id,
-            "device_type_id": model_o.id,
-        }
-    )
+    if "role_id" not in kwargs and "device_role_id" not in kwargs:
+        devicerole_o = devicerole.get(name="Unknown")
+        if not devicerole_o:
+            devicerole_o = devicerole.create(name="Unknown")
+        kwargs["role_id"] = devicerole_o.id
 
     kwargs = normalize_role_kwargs(kwargs)
     kwargs = utils.delete_empty_keys(kwargs)
@@ -142,6 +139,10 @@ def get_list(**kwargs):
 def update(obj, manufacturer=None, model_keyword=None, **kwargs):
     """Update a Device."""
     update_always = ["cluster_id", "role_id"]
+    if "device_type_id" in kwargs:
+        update_always.append("device_type_id")
+    if "site_id" in kwargs:
+        update_always.append("site_id")
 
     if manufacturer and model_keyword and "Unknown" in obj.device_type.model:
         # Manufacturer and model are set, current model is uknown, adding to update_always

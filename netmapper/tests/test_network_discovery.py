@@ -12,6 +12,7 @@ from netmapper.network_discovery import (
     infer_device_role,
     infer_discovery_mode,
     merge_identity_note,
+    normalize_snmp_communities,
     run_snmp_identity_probe,
     parse_nmap_xml_hosts,
     parse_snmpget_output,
@@ -114,6 +115,22 @@ class NetworkDiscoveryHelperTest(SimpleTestCase):
         self.assertEqual(metadata.sys_descr, "Cisco IOS Software, C9300")
         self.assertEqual(metadata.sys_object_id, "1.3.6.1.4.1.9.1.1745")
 
+    def test_normalize_snmp_communities_adds_public_fallback(self):
+        """A custom SNMP community should fall back to public once."""
+        communities = normalize_snmp_communities(
+            "kavanoz06",
+            fallback_communities=["public"],
+        )
+        self.assertEqual(communities, ["kavanoz06", "public"])
+
+    def test_normalize_snmp_communities_appends_fallback_uniquely(self):
+        """Community parsing should preserve order and avoid duplicates."""
+        communities = normalize_snmp_communities(
+            "kavanoz06, public",
+            fallback_communities=["public"],
+        )
+        self.assertEqual(communities, ["kavanoz06", "public"])
+
     @patch("netmapper.network_discovery.subprocess.run")
     def test_run_snmp_identity_probe_handles_multiline_sysdescr(self, mock_run):
         """SNMP identity probing should preserve multiline sysDescr output."""
@@ -153,6 +170,45 @@ class NetworkDiscoveryHelperTest(SimpleTestCase):
         self.assertIn("Cisco IOS Software", metadata.sys_descr)
         self.assertIn("Technical Support", metadata.sys_descr)
         self.assertEqual(metadata.sys_object_id, "1.3.6.1.4.1.9.1.516")
+        self.assertIsNone(metadata.error)
+
+    @patch("netmapper.network_discovery.subprocess.run")
+    def test_run_snmp_identity_probe_retries_next_community(self, mock_run):
+        """SNMP identity probing should fall through to the next community."""
+        mock_run.side_effect = [
+            type("Result", (), {"returncode": 1, "stdout": "", "stderr": "Timeout"})(),
+            type("Result", (), {"returncode": 1, "stdout": "", "stderr": "Timeout"})(),
+            type("Result", (), {"returncode": 1, "stdout": "", "stderr": "Timeout"})(),
+            type("Result", (), {"returncode": 0, "stdout": "yealink-lobby\n", "stderr": ""})(),
+            type(
+                "Result",
+                (),
+                {
+                    "returncode": 0,
+                    "stdout": "Yealink SIP-T54W IP Phone\n",
+                    "stderr": "",
+                },
+            )(),
+            type(
+                "Result",
+                (),
+                {
+                    "returncode": 0,
+                    "stdout": "1.3.6.1.4.1.1916.1.170\n",
+                    "stderr": "",
+                },
+            )(),
+        ]
+
+        metadata = run_snmp_identity_probe(
+            address="192.0.2.55",
+            community=["kavanoz06", "public"],
+            executable="snmpget",
+        )
+
+        self.assertEqual(metadata.sys_name, "yealink-lobby")
+        self.assertEqual(metadata.sys_descr, "Yealink SIP-T54W IP Phone")
+        self.assertEqual(metadata.sys_object_id, "1.3.6.1.4.1.1916.1.170")
         self.assertIsNone(metadata.error)
 
     def test_infer_discovery_mode(self):
@@ -231,6 +287,14 @@ class NetworkDiscoveryHelperTest(SimpleTestCase):
         self.assertEqual(role, "switch")
         self.assertEqual(confidence, "medium")
         self.assertTrue("c9300" in reason or "switch" in reason)
+        role, confidence, reason = infer_device_role(
+            sys_descr="Yealink SIP-T54W IP Phone",
+            hostname="lobby-phone",
+            vendor="Yealink",
+        )
+        self.assertEqual(role, "phone")
+        self.assertEqual(confidence, "high")
+        self.assertIn("yealink", reason.lower())
 
     def test_candidate_to_summary_includes_role_metadata(self):
         """Candidate summaries should expose role inference details to the UI."""
@@ -298,3 +362,29 @@ class NetworkDiscoveryHelperTest(SimpleTestCase):
             all(candidate.snmp_metadata and candidate.snmp_metadata.sys_name for candidate in candidates)
         )
         self.assertTrue(all(candidate.inferred_role == "switch" for candidate in candidates))
+
+    @patch("netmapper.network_discovery.run_snmp_identity_probe")
+    @patch("netmapper.network_discovery.run_nmap_ping_scan")
+    def test_scan_host_candidates_uses_public_as_fallback_community(
+        self, mock_nmap_scan, mock_snmp_probe
+    ):
+        """Subnet scans should append public after the user-supplied community."""
+        mock_nmap_scan.return_value = [NmapHostResult(address="192.0.2.131")]
+        mock_snmp_probe.return_value = SnmpHostMetadata(
+            address="192.0.2.131",
+            sys_name="yealink-lobby",
+            sys_descr="Yealink SIP-T54W IP Phone",
+            sys_object_id="1.3.6.1.4.1.1916.1.170",
+        )
+
+        candidates = scan_host_candidates(
+            ["192.0.2.131-140"],
+            default_mode="netmiko_cisco_ios",
+            snmp_community="kavanoz06",
+            host_timeout=10,
+            snmp_timeout=2,
+        )
+
+        self.assertEqual(len(candidates), 1)
+        _, kwargs = mock_snmp_probe.call_args
+        self.assertEqual(kwargs["community"], ["kavanoz06", "public"])

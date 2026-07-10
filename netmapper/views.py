@@ -40,6 +40,7 @@ from netmapper.credential_testing import (
 from netmapper.network_discovery import (
     build_scan_plan,
     candidate_to_summary,
+    normalize_snmp_communities,
     scan_host_candidates,
 )
 from netmapper.job_tracking import reconcile_scan_record_job
@@ -293,6 +294,24 @@ class NetworkScanView(PermissionRequiredMixin, FormView):
     permission_required = "netmapper.change_discoverable"
     template_name = "netmapper/network_scan.html"
 
+    @staticmethod
+    def _get_placeholder_credential():
+        """Return a reusable placeholder credential for SNMP-only scans."""
+        credential_o, _ = models.Credential.objects.get_or_create(
+            name="SNMP Scan Placeholder",
+            defaults={
+                "username": "",
+                "password": "",
+                "enable_password": "",
+                "verify_cert": True,
+            },
+        )
+        return credential_o
+
+    def _resolve_form_credential(self, form):
+        """Resolve the credential stored in network scan history."""
+        return form.cleaned_data.get("credential") or self._get_placeholder_credential()
+
     def get_success_url(self):
         """Redirect back to the scan page after submitting a job."""
         return reverse("plugins:netmapper:network_scan")
@@ -345,9 +364,12 @@ class NetworkScanView(PermissionRequiredMixin, FormView):
 
     def _create_scan_record(self, form, plan, dry_run=False):
         """Persist a network scan history record."""
+        effective_discover_now = bool(
+            form.cleaned_data["discover_now"] and form.cleaned_data.get("credential")
+        )
         return models.NetworkScanRecord.objects.create(
             site=form.cleaned_data["site"],
-            credential=form.cleaned_data["credential"],
+            credential=self._resolve_form_credential(form),
             snmp_credential=form.cleaned_data.get("snmp_credential"),
             default_mode=form.cleaned_data["default_mode"],
             targets=form.cleaned_data["targets"],
@@ -355,7 +377,7 @@ class NetworkScanView(PermissionRequiredMixin, FormView):
             invalid_targets=plan.invalid_targets,
             filters=form.cleaned_data["filters"],
             filter_type=form.cleaned_data["filter_type"],
-            discover_now=form.cleaned_data["discover_now"],
+            discover_now=effective_discover_now,
             overwrite_mode=form.cleaned_data["overwrite_mode"],
             dry_run=dry_run,
             store_identity_notes=form.cleaned_data["store_identity_notes"],
@@ -417,7 +439,12 @@ class NetworkScanView(PermissionRequiredMixin, FormView):
                 candidates = scan_host_candidates(
                     plan.normalized_targets,
                     default_mode=post_data["default_mode"],
-                    snmp_community=post_data["snmp_community"],
+                    snmp_community=normalize_snmp_communities(
+                        post_data["snmp_community"],
+                        fallback_communities=["public"]
+                        if post_data["snmp_community"]
+                        else None,
+                    ),
                     snmp_port=post_data["snmp_port"],
                     snmp_version=post_data["snmp_version"],
                     host_timeout=post_data["nmap_host_timeout"],

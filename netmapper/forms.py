@@ -329,8 +329,11 @@ class NetworkScanForm(forms.Form):
 
     credential = forms.ModelChoiceField(
         queryset=Credential.objects.all(),
-        required=True,
-        help_text="Credential attached to created discoverables.",
+        required=False,
+        help_text=(
+            "Optional login credential attached to created discoverables. "
+            "Leave empty for SNMP-only scans."
+        ),
     )
     snmp_credential = forms.ModelChoiceField(
         queryset=SnmpCredential.objects.all(),

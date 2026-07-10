@@ -296,6 +296,27 @@ def parse_snmpget_output(address, output):
     )
 
 
+def normalize_snmp_communities(community, fallback_communities=None):
+    """Return an ordered unique list of SNMP communities to try."""
+    communities = []
+
+    if isinstance(community, str):
+        communities.extend(
+            item.strip()
+            for item in re.split(r"[\s,;]+", community)
+            if item.strip()
+        )
+    elif community:
+        communities.extend(str(item).strip() for item in community if str(item).strip())
+
+    if fallback_communities:
+        communities.extend(
+            str(item).strip() for item in fallback_communities if str(item).strip()
+        )
+
+    return list(dict.fromkeys(communities))
+
+
 def _run_snmpget_value(
     address,
     community,
@@ -372,30 +393,46 @@ def run_snmp_identity_probe(
         "sys_descr": "1.3.6.1.2.1.1.1.0",
         "sys_object_id": "1.3.6.1.2.1.1.2.0",
     }
-    values = {}
-    errors = []
+    communities = normalize_snmp_communities(community)
+    if not communities:
+        return SnmpHostMetadata(address=address, error="SNMP community was not provided")
 
-    for field, oid in oid_map.items():
-        value, error = _run_snmpget_value(
+    all_errors = []
+    for current_community in communities:
+        values = {}
+        errors = []
+
+        for field, oid in oid_map.items():
+            value, error = _run_snmpget_value(
+                address=address,
+                community=current_community,
+                oid=oid,
+                port=port,
+                version=version,
+                timeout=timeout,
+                retries=retries,
+                executable=executable,
+            )
+            values[field] = value
+            if error:
+                errors.append(f"{field}: {error}")
+
+        metadata = SnmpHostMetadata(
             address=address,
-            community=community,
-            oid=oid,
-            port=port,
-            version=version,
-            timeout=timeout,
-            retries=retries,
-            executable=executable,
+            sys_name=values["sys_name"],
+            sys_descr=values["sys_descr"],
+            sys_object_id=values["sys_object_id"],
+            error="; ".join(errors) if errors and not any(values.values()) else None,
         )
-        values[field] = value
-        if error:
-            errors.append(f"{field}: {error}")
+        if snmp_metadata_has_identity(metadata):
+            return metadata
+
+        if metadata.error:
+            all_errors.append(f"{current_community}: {metadata.error}")
 
     return SnmpHostMetadata(
         address=address,
-        sys_name=values["sys_name"],
-        sys_descr=values["sys_descr"],
-        sys_object_id=values["sys_object_id"],
-        error="; ".join(errors) if errors and not any(values.values()) else None,
+        error="; ".join(all_errors) if all_errors else "SNMP probe failed",
     )
 
 
@@ -560,6 +597,19 @@ def infer_device_role(
             ],
         ),
         (
+            "phone",
+            "high",
+            [
+                "ip phone",
+                "voip phone",
+                "sip phone",
+                "desk phone",
+                "yealink",
+                "polycom",
+                "grandstream",
+            ],
+        ),
+        (
             "server",
             "medium",
             [
@@ -610,6 +660,10 @@ def scan_host_candidates(
     snmp_fallback_max_hosts=256,
 ):
     """Run the scan and return enriched host candidates without persisting them."""
+    snmp_communities = normalize_snmp_communities(
+        snmp_community,
+        fallback_communities=["public"] if snmp_community else None,
+    )
     normalized_targets = list(
         dict.fromkeys(
             normalize_target_spec(str(target).strip())
@@ -625,7 +679,7 @@ def scan_host_candidates(
     hosts_by_address = {host.address: host for host in hosts}
     snmp_metadata_by_address = {}
 
-    if snmp_community:
+    if snmp_communities:
         target_addresses = expand_target_spec_addresses(normalized_targets)
         if len(target_addresses) <= int(snmp_fallback_max_hosts):
             for address in target_addresses:
@@ -633,7 +687,7 @@ def scan_host_candidates(
                     continue
                 snmp_metadata = run_snmp_identity_probe(
                     address=address,
-                    community=snmp_community,
+                    community=snmp_communities,
                     port=snmp_port,
                     version=snmp_version,
                     timeout=snmp_timeout,
@@ -655,10 +709,10 @@ def scan_host_candidates(
         role_reason = None
         snmp_metadata = snmp_metadata_by_address.get(host.address)
 
-        if snmp_community and snmp_metadata is None:
+        if snmp_communities and snmp_metadata is None:
             snmp_metadata = run_snmp_identity_probe(
                 address=host.address,
-                community=snmp_community,
+                community=snmp_communities,
                 port=snmp_port,
                 version=snmp_version,
                 timeout=snmp_timeout,

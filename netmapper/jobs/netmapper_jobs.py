@@ -55,7 +55,12 @@ from netmapper.network_discovery import (
     build_scan_plan,
     candidate_to_summary,
     merge_identity_note,
+    normalize_snmp_communities,
     scan_host_candidates,
+)
+from netmapper.scan_ingestion import (
+    candidate_requires_generic_seed,
+    seed_device_from_scan_candidate,
 )
 
 PLUGIN_SETTINGS = settings.PLUGINS_CONFIG.get("netmapper", {})
@@ -298,8 +303,11 @@ class ScanNetwork(Script):
 
     credential = ObjectVar(
         model=Credential_m,
-        description="Credential attached to created discoverables.",
-        required=True,
+        description=(
+            "Optional login credential attached to created discoverables. "
+            "Leave empty for SNMP-only scans."
+        ),
+        required=False,
         widget=APISelect(api_url=CREDENTIAL_API_URL),
     )
     default_mode = ChoiceVar(
@@ -401,11 +409,25 @@ class ScanNetwork(Script):
         scan_record.save()
 
     @staticmethod
-    def _create_scan_record(data, plan, dry_run=False):
+    def _get_placeholder_credential():
+        """Return a reusable placeholder credential for SNMP-only scans."""
+        credential_o, _ = Credential_m.objects.get_or_create(
+            name="SNMP Scan Placeholder",
+            defaults={
+                "username": "",
+                "password": "",
+                "enable_password": "",
+                "verify_cert": True,
+            },
+        )
+        return credential_o
+
+    @staticmethod
+    def _create_scan_record(data, plan, credential, discover_now, dry_run=False):
         """Create a scan history record for direct script execution."""
         return NetworkScanRecord_m.objects.create(
             site=data["site"],
-            credential=data["credential"],
+            credential=credential,
             snmp_credential=data.get("snmp_credential"),
             default_mode=data["default_mode"],
             targets=data["targets"],
@@ -413,7 +435,7 @@ class ScanNetwork(Script):
             invalid_targets=plan.invalid_targets,
             filters=data.get("filters") or "",
             filter_type=data.get("filter_type") or "",
-            discover_now=bool(data.get("discover_now")),
+            discover_now=bool(discover_now),
             overwrite_mode=bool(data.get("overwrite_mode")),
             dry_run=dry_run,
             store_identity_notes=data.get("store_identity_notes", True),
@@ -502,6 +524,15 @@ class ScanNetwork(Script):
             filters = _normalize_filters(data.get("filters"))
             filter_type = data.get("filter_type")
             snmp_credential = data.get("snmp_credential")
+            credential_requested = credential_o is not None
+            if not credential_requested:
+                credential_o = self._get_placeholder_credential()
+            effective_discover_now = bool(discover_now and credential_requested)
+            if discover_now and not credential_requested:
+                self.log_warning(
+                    "No login credential supplied. Running SNMP-only scan and skipping "
+                    "queued CLI discovery."
+                )
 
             snmp_community = (data.get("snmp_community") or "").strip()
             snmp_port = data.get("snmp_port") or 161
@@ -510,6 +541,10 @@ class ScanNetwork(Script):
                 snmp_community = snmp_credential.get_secrets().get("community") or ""
                 snmp_port = snmp_credential.port
                 snmp_version = snmp_credential.version
+            snmp_communities = normalize_snmp_communities(
+                snmp_community,
+                fallback_communities=["public"] if snmp_community else None,
+            )
 
             plan = build_scan_plan(
                 data.get("targets"),
@@ -519,7 +554,12 @@ class ScanNetwork(Script):
             if scan_record_id:
                 scan_record = NetworkScanRecord_m.objects.filter(pk=scan_record_id).first()
             if not scan_record:
-                scan_record = self._create_scan_record(data, plan)
+                scan_record = self._create_scan_record(
+                    data,
+                    plan,
+                    credential=credential_o,
+                    discover_now=effective_discover_now,
+                )
 
             self._save_scan_record(
                 scan_record,
@@ -585,7 +625,7 @@ class ScanNetwork(Script):
                 candidates = scan_host_candidates(
                     plan.normalized_targets,
                     default_mode=default_mode,
-                    snmp_community=snmp_community,
+                    snmp_community=snmp_communities,
                     snmp_port=snmp_port,
                     snmp_version=snmp_version,
                     host_timeout=data.get("nmap_host_timeout") or NMAP_HOST_TIMEOUT,
@@ -648,6 +688,7 @@ class ScanNetwork(Script):
             updated_count = 0
             reused_count = 0
             snmp_failures_count = 0
+            seeded_device_count = 0
             scan_discoverables = []
             result_rows = []
 
@@ -664,7 +705,7 @@ class ScanNetwork(Script):
                 ).first()
                 if discoverable_o:
                     change_list = []
-                    if discoverable_o.credential_id != credential_o.pk:
+                    if credential_requested and discoverable_o.credential_id != credential_o.pk:
                         discoverable_o.credential = credential_o
                         change_list.append("credential")
                     if discoverable_o.site_id != site_o.pk:
@@ -714,7 +755,19 @@ class ScanNetwork(Script):
                         f"{candidate.selected_mode}"
                     )
 
-                scan_discoverables.append(discoverable_o)
+                if candidate_requires_generic_seed(candidate):
+                    seeded_device_count += 1
+                    device_o, device_created = seed_device_from_scan_candidate(
+                        discoverable_o,
+                        candidate,
+                    )
+                    action = "Created" if device_created else "Updated"
+                    self.log_info(
+                        f"{action} generic NetBox device {device_o.name} from scan identity "
+                        f"for {candidate.host.address}"
+                    )
+                else:
+                    scan_discoverables.append(discoverable_o)
                 self._log_candidate_identity(candidate)
                 result_rows.append(candidate_to_summary(candidate))
 
@@ -732,23 +785,26 @@ class ScanNetwork(Script):
                     "updated_count": updated_count,
                     "reused_count": reused_count,
                     "snmp_failures_count": snmp_failures_count,
+                    "seeded_device_count": seeded_device_count,
                 },
             )
 
             summary = {
-                "discover_now": discover_now,
+                "discover_now": effective_discover_now,
+                "discover_now_requested": bool(discover_now),
                 "filters": filters,
                 "filter_type": filter_type,
                 "responsive_hosts_count": len(candidates),
                 "snmp_failures_count": snmp_failures_count,
+                "seeded_device_count": seeded_device_count,
             }
 
-            if not discover_now:
+            if not effective_discover_now:
                 summary.update(
                     {
                         "current_stage": "completed",
                         "current_stage_label": "Completed",
-                        "status_message": "Scan finished without queued discovery.",
+                        "status_message": "Scan finished without queued CLI discovery.",
                         "progress_percent": 100,
                     }
                 )
