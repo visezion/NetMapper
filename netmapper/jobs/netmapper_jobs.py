@@ -25,6 +25,7 @@ from extras.scripts import (
     IntegerVar,
     StringVar,
 )
+from utilities.forms.widgets import APISelect, APISelectMultiple
 
 from netmapper.models import (
     Discoverable as Discoverable_m,
@@ -67,6 +68,10 @@ NMAP_HOST_TIMEOUT = PLUGIN_SETTINGS.get("NMAP_HOST_TIMEOUT", 30)
 SNMP_FALLBACK_MAX_HOSTS = PLUGIN_SETTINGS.get("SNMP_FALLBACK_MAX_HOSTS", 256)
 SNMP_TIMEOUT = PLUGIN_SETTINGS.get("SNMP_TIMEOUT", 2)
 SUBNET_SCAN_MAX_HOSTS = PLUGIN_SETTINGS.get("SUBNET_SCAN_MAX_HOSTS", 4096)
+PLUGIN_API_BASE = "/api/plugins/netmapper"
+CREDENTIAL_API_URL = f"{PLUGIN_API_BASE}/credential/"
+SNMP_CREDENTIAL_API_URL = f"{PLUGIN_API_BASE}/snmpcredential/"
+DISCOVERABLE_API_URL = f"{PLUGIN_API_BASE}/discoverable/"
 
 
 def _normalize_filters(raw_filters):
@@ -173,6 +178,7 @@ class AddDiscoverable(Script):
         model=Credential_m,
         description="Credential used to discover.",
         required=True,
+        widget=APISelect(api_url=CREDENTIAL_API_URL),
     )
 
     # Discovery mode
@@ -294,6 +300,7 @@ class ScanNetwork(Script):
         model=Credential_m,
         description="Credential attached to created discoverables.",
         required=True,
+        widget=APISelect(api_url=CREDENTIAL_API_URL),
     )
     default_mode = ChoiceVar(
         choices=DiscoveryModeChoices.CHOICES,
@@ -318,6 +325,7 @@ class ScanNetwork(Script):
             "When selected, it overrides the manual SNMP fields below."
         ),
         required=False,
+        widget=APISelect(api_url=SNMP_CREDENTIAL_API_URL),
     )
     snmp_community = StringVar(
         description=(
@@ -845,6 +853,7 @@ class Discover(Script):
         query_params={"discoverable": True},  # An API filterset must exists
         description="Devices to be discovered (leave empty to discover everything).",
         required=False,
+        widget=APISelectMultiple(api_url=DISCOVERABLE_API_URL),
     )
 
     # Ingested?
@@ -934,6 +943,7 @@ class Ingest(Script):
         model=Discoverable_m,
         description="Limit ingestion to selected discoverables.",
         required=False,
+        widget=APISelectMultiple(api_url=DISCOVERABLE_API_URL),
     )
 
     # Ingested?
