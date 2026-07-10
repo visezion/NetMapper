@@ -102,7 +102,16 @@ cd ~/netbox-lab/netbox-docker
 docker compose up -d
 ```
 
-## 5. Deploy when your paths differ
+## 5. Create the first NetBox superuser
+
+Run this after the containers are healthy:
+
+```bash
+cd ~/netbox-lab/netbox-docker
+docker compose exec netbox /opt/netbox/netbox/manage.py createsuperuser
+```
+
+## 6. Deploy when your paths differ
 
 ```bash
 cd /path/to/NetMapper
@@ -111,19 +120,19 @@ NETMAPPER_PATH=/path/to/NetMapper \
 ./scripts/deploy_netbox_docker.sh <release-tag>
 ```
 
-## 6. Deploy from a dirty tree for development only
+## 7. Deploy from a dirty tree for development only
 
 ```bash
 ALLOW_DIRTY=1 ./scripts/deploy_netbox_docker.sh main
 ```
 
-## 7. Force a full clean rebuild when needed
+## 8. Force a full clean rebuild when needed
 
 ```bash
 BUILD_NO_CACHE=1 ./scripts/deploy_netbox_docker.sh main
 ```
 
-## 8. Override the NetBox image version only if you mean to test another 4.6 release
+## 9. Override the NetBox image version only if you mean to test another 4.6 release
 
 The plugin is intended for NetBox `4.6.x`. The Docker build defaults to `4.6.4`.
 
@@ -134,7 +143,7 @@ docker compose build --build-arg NETBOX_VERSION=v4.6.4
 
 If you change the version, stay within the supported `4.6.x` range unless you are doing development validation.
 
-## 9. Update an existing netbox-docker deployment
+## 10. Update an existing netbox-docker deployment
 
 Use the release tag you want to deploy:
 
@@ -175,5 +184,6 @@ git checkout <release-tag>  # for example: v1.0.2
 
 cd ~/netbox-lab/netbox-docker
 docker compose ps
+docker compose exec netbox /opt/netbox/netbox/manage.py createsuperuser
 docker update --restart unless-stopped $(docker ps -aq)
 ```

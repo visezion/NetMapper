@@ -62,17 +62,26 @@ python3 manage.py migrate
 python3 manage.py collectstatic --no-input
 ```
 
-## 7. Optional manual asset sync
+## 7. Create the first NetBox superuser
+
+Activate your NetBox virtual environment first if your deployment uses one, then
+run the command from the NetBox application directory:
+
+```bash
+python3 manage.py createsuperuser
+```
+
+## 8. Optional manual asset sync
 
 ```bash
 python3 manage.py shell -c "from netmapper import sync_plugin_assets; sync_plugin_assets()"
 ```
 
-## 8. Restart NetBox services
+## 9. Restart NetBox services
 
 Restart your web server, background worker, and any process manager services used by your NetBox deployment.
 
-## 9. Update an existing NetBox installation
+## 10. Update an existing NetBox installation
 
 Use the release tag you want to deploy:
 
