@@ -55,6 +55,7 @@ cd ~/netbox-lab/netbox-docker
 docker compose ps
 docker compose logs --tail=100 netbox
 docker compose logs --tail=100 netbox-worker
+docker compose exec netbox /opt/netbox/netbox/manage.py createsuperuser
 ```
 
 ### Existing NetBox instance
@@ -92,6 +93,12 @@ Apply the NetBox changes:
 python3 manage.py migrate
 python3 manage.py collectstatic --no-input
 python3 manage.py shell -c "from netmapper import sync_plugin_assets; sync_plugin_assets()"
+```
+
+Create the first NetBox superuser from the NetBox application directory:
+
+```bash
+python3 manage.py createsuperuser
 ```
 
 Then restart the NetBox web and worker services used by your environment.
