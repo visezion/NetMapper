@@ -129,7 +129,7 @@ docker image rm -f "netbox:${NETMAPPER_IMAGE_TAG}" || true
 
 log_step "Building NetMapper image"
 BUILD_ARGS=()
-if [ "$PULL_BASE_IMAGES" = "1" ]; then
+if [ "$PULL_BASE_IMAGES" = "1" ]; thene 
     BUILD_ARGS+=(--pull)
 fi
 if [ "$BUILD_NO_CACHE" = "1" ]; then
